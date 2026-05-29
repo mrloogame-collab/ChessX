@@ -1423,7 +1423,8 @@ function showScreen(id){
   }
 }
 function closeModal(id){document.getElementById(id).classList.remove('active');}
-function goToMenu(){clearInterval(timerInterval);AUD.stopTheme();document.getElementById('story-dlg').classList.remove('show');showScreen('title-screen');}
+function goToMenu(){
+  if(gameMode==='p2p') cleanupP2P();clearInterval(timerInterval);AUD.stopTheme();document.getElementById('story-dlg').classList.remove('show');showScreen('title-screen');}
 
 /* ── ADS ── */
 const adPool=[{title:'⚔ Upgrade Your Kingdom!',sub:'Tap to claim your free gold reward'},{title:'🏰 Medieval Empire Builder',sub:'Build & conquer — Play Free'},{title:'🛡 War of Thrones',sub:'Join 10 million warriors worldwide'},{title:'👑 Royal Match — Play Now',sub:'Puzzle your way to the throne'},{title:'⚔ Clash of Castles',sub:'Lead your army to glory'},{title:'🗡 Blade & Honor',sub:'New season — limited time rewards'}];
@@ -2194,10 +2195,9 @@ function updateTimerDisplay(){
     // In local hotseat, current player is always bottom
     bottomColor = turn;
     topColor    = turn==='w'?'b':'w';
-  } else if(gameMode==='supabase'){
-    // In online, your color is always bottom
-    bottomColor = sbPlayerColor||'w';
-    topColor    = sbPlayerColor==='w'?'b':'w';
+  } else if(gameMode==='supabase'||gameMode==='p2p'){
+    bottomColor = window.sbPlayerColor||'w';
+    topColor    = window.sbPlayerColor==='w'?'b':'w';
   } else {
     // Single player / default: white always bottom
     bottomColor = 'w';
@@ -2217,7 +2217,8 @@ function renderBoard(){
   // Online: flip for black player (sbBoardFlipped set in startOnlineGame)
   // Local hotseat: flip when it's black's turn so current player sees their pieces at bottom
   const flipped = window.sbBoardFlipped === true ||
-                  (gameMode==='local' && turn==='b');
+                  (gameMode==='local' && turn==='b') ||
+                  (gameMode==='p2p' && window.sbBoardFlipped===true);
   const rowLabels = flipped ? '12345678' : '87654321';
   const colLabels = flipped ? 'hgfedcba' : 'abcdefgh';
   document.getElementById('coord-r').innerHTML=rowLabels.split('').map(n=>`<span>${n}</span>`).join('');
@@ -2239,8 +2240,8 @@ const kId=gameMode==='conquest'&&piece.color==='b'&&activeConquestKingdom?active
 }
 function updateCaptured(){const pc={P:'♟',R:'♜',N:'♞',B:'♝',Q:'♛',K:'♚'};document.getElementById('p1-caps').textContent=capturedB.map(p=>pc[p]||p).join('');document.getElementById('p2-caps').textContent=capturedW.map(p=>pc[p]||p).join('');}
 function handleClick(r,c){
-  // Online mode: block if not your turn
-  if(gameMode==='supabase' && turn!==sbPlayerColor) return;
+  // Online/P2P mode: block if not your turn
+  if((gameMode==='supabase'||gameMode==='p2p') && turn!==window.sbPlayerColor) return;
 
   const piece=board[r][c];
 
@@ -2248,7 +2249,7 @@ function handleClick(r,c){
     const mv=legalMoves.find(m=>m.r===r&&m.c===c);
     if(mv){
       // Online: verify moving own piece
-      if(gameMode==='supabase'){
+      if(gameMode==='supabase'||gameMode==='p2p'){
         const mp=board[selected.r][selected.c];
         if(!mp||mp.color!==sbPlayerColor){
           selected=null;legalMoves=[];renderBoard();return;
@@ -2265,7 +2266,7 @@ function handleClick(r,c){
       return;
     }
     if(piece&&piece.color===turn){
-      if(gameMode==='supabase'&&piece.color!==sbPlayerColor){
+      if((gameMode==='supabase'||gameMode==='p2p')&&piece.color!==window.sbPlayerColor){
         selected=null;legalMoves=[];renderBoard();return;
       }
       selected={r,c};legalMoves=getLegalMoves(r,c);renderBoard();return;
@@ -2275,7 +2276,7 @@ function handleClick(r,c){
 
   // Select piece — only current turn's color
   if(piece&&piece.color===turn){
-    if(gameMode==='supabase'&&piece.color!==sbPlayerColor) return;
+    if((gameMode==='supabase'||gameMode==='p2p')&&piece.color!==window.sbPlayerColor) return;
     selected={r,c};legalMoves=getLegalMoves(r,c);renderBoard();
   }
 }
@@ -2295,7 +2296,11 @@ function executeMove(fr,fc,tr,tc,mv){
   document.getElementById('move-count').textContent=`Move ${Math.ceil(moveHistory.length/2)}`;
   if(piece.type==='P'&&(tr===0||tr===7)){showPromotion(tr,tc,piece.color);return;}
   turn=turn==='w'?'b':'w';selected=null;legalMoves=[];renderBoard();updateStatus();
-  if(gameMode==='p2p'&&!arguments[5])sendP2PMove({fr,fc,r:tr,c:tc,...mv});
+  if(gameMode==='p2p'&&!arguments[5]){
+    // Only send if it's our piece
+    if(board[fr]&&board[fr][fc]&&board[fr][fc].color===window.sbPlayerColor)
+      sendP2PMove({fr,fc,r:tr,c:tc,...mv});
+  }
   // Send move to online opponent (Supabase)
   if(gameMode==='supabase' && !arguments[5]){
     sendOnlineMove({fr,fc,r:tr,c:tc,...mv});
@@ -2505,7 +2510,7 @@ function updateStatus(){
   if(ic)AUD.playCheck();
 
   // Multiplayer: show clear YOUR TURN / WAITING message
-  if(gameMode==='supabase'){
+  if(gameMode==='supabase'||gameMode==='p2p'){
     const isMyTurn = turn===sbPlayerColor;
     const statusEl = document.getElementById('status-text');
     if(isMyTurn){
@@ -2966,7 +2971,7 @@ function aiUndoMove(saved){restoreBoard(saved.snap);enPassantTarget=saved.sep;ca
    REAL P2P MULTIPLAYER via PeerJS
    Uses free PeerJS cloud server for signaling
 ══════════════════════════════════════════════ */
-let roomCode='', p2pPeer=null, p2pConn=null, isHost=false, p2pReady=false;
+let roomCode='';
 
 function generateRoomCode(){
   const ch='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -2984,1281 +2989,827 @@ function loadPeerJS(cb){
   document.head.appendChild(s);
 }
 
-function hostP2PGame(){
+/* ══════════════════════════════════════════════
+   P2P MULTIPLAYER — COMPLETE REWRITE
+   Uses Supabase as signaling server (no PeerJS needed)
+   Host creates room → Guest joins → Both get color assigned
+   Moves sync via Supabase Realtime
+══════════════════════════════════════════════ */
+
+// P2P state
+let p2pColor    = null;  // 'w' = host, 'b' = guest
+let p2pRoomId   = null;
+let p2pPlayerId = null;
+let p2pOpponent = null;
+let p2pPollTimer= null;
+let p2pWS       = null;
+let p2pReady    = false;
+let isHost      = false;
+let p2pConn     = null; // kept for legacy compat
+let p2pPeer     = null; // kept for legacy compat
+
+function generateRoomCode(){
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  roomCode=Array.from({length:6},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
+  const el=document.getElementById('room-code-display');
+  if(el) el.textContent=roomCode;
+  return roomCode;
+}
+
+function setP2PStatus(msg, color='#c9a84c'){
+  const el=document.getElementById('wifi-status-text');
+  if(el){el.textContent=msg;el.style.color=color;}
+}
+
+// ── HOST: Create room and wait ──
+async function hostP2PGame(){
   generateRoomCode();
-  const statusEl=document.getElementById('wifi-status-text');
-  const dotEl=document.getElementById('host-dot');
-  if(statusEl) statusEl.textContent='Connecting to server…';
-  if(dotEl) dotEl.style.background='#f39c12';
-  loadPeerJS((fallback)=>{
-    if(fallback||!window.Peer){
-      if(statusEl) statusEl.textContent='Room created! Share: '+roomCode;
-      if(dotEl) dotEl.style.background='#2ecc71';
-      setTimeout(()=>{if(statusEl)statusEl.textContent='Opponent joined!';setTimeout(()=>startGame('p2p',''),1000);},3000);
+  p2pPlayerId = 'host_'+Date.now();
+  p2pColor    = 'w'; // host is always White
+  isHost      = true;
+  p2pRoomId   = 'P2P_'+roomCode;
+
+  setP2PStatus('Creating room…','#f39c12');
+
+  try{
+    // Delete any old room with same code
+    await sbDelete('chess_rooms','id=eq.'+p2pRoomId).catch(()=>{});
+
+    // Create room in Supabase
+    await sbInsert('chess_rooms',{
+      id:          p2pRoomId,
+      host_id:     p2pPlayerId,
+      host_name:   'HOST',
+      host_rating: 1200,
+      status:      'waiting',
+      board_state: '',
+      current_turn:'w',
+      last_move:   '',
+      mode:        'p2p'
+    });
+
+    setP2PStatus('Room ready! Share code: '+roomCode,'#2ecc71');
+
+    // Connect realtime
+    p2pWS = sbRealtime(p2pRoomId, onP2PEvent);
+
+    // Poll for guest
+    p2pPollTimer = setInterval(async()=>{
+      try{
+        const rows = await sbSelect('chess_rooms','id=eq.'+p2pRoomId);
+        if(rows&&rows[0]&&rows[0].status==='playing'&&rows[0].guest_id){
+          clearInterval(p2pPollTimer);
+          p2pOpponent = rows[0].guest_name||'Opponent';
+          setP2PStatus('Opponent connected! Starting…','#2ecc71');
+          setTimeout(()=>startP2PGame(),1000);
+        }
+      }catch(e){}
+    },1500);
+
+    // Timeout 5 min
+    setTimeout(()=>{
+      if(!p2pReady){
+        clearInterval(p2pPollTimer);
+        sbDelete('chess_rooms','id=eq.'+p2pRoomId).catch(()=>{});
+        setP2PStatus('Timed out. Try again.','#e74c3c');
+      }
+    },300000);
+
+  }catch(err){
+    setP2PStatus('Error: '+err.message,'#e74c3c');
+  }
+}
+
+// ── GUEST: Join room by code ──
+async function joinP2PGame(){
+  const code=(document.getElementById('join-code-input')?.value||'').trim().toUpperCase();
+  if(code.length!==6){alert('Enter the 6-character room code.');return;}
+
+  p2pPlayerId = 'guest_'+Date.now();
+  p2pColor    = 'b'; // guest is always Black
+  isHost      = false;
+  p2pRoomId   = 'P2P_'+code;
+  roomCode    = code;
+
+  setP2PStatus('Joining room '+code+'…','#f39c12');
+
+  try{
+    // Find the room
+    const rows = await sbSelect('chess_rooms','id=eq.'+p2pRoomId);
+    if(!rows||rows.length===0){
+      setP2PStatus('Room not found! Check the code.','#e74c3c');
       return;
     }
-    isHost=true;
-    try{
-      p2pPeer=new Peer('CHESSX_'+roomCode,{debug:0});
-      p2pPeer.on('open',()=>{if(statusEl)statusEl.textContent='Room ready! Code: '+roomCode;if(dotEl)dotEl.style.background='#2ecc71';navigator.clipboard?.writeText(roomCode).catch(()=>{});});
-      p2pPeer.on('connection',conn=>{p2pConn=conn;setupP2PConn(conn);if(statusEl)statusEl.textContent='Opponent connected!';setTimeout(()=>startP2PGame(),800);});
-      p2pPeer.on('error',()=>{if(statusEl)statusEl.textContent='Server error — using simulated mode';});
-    }catch(e){if(statusEl)statusEl.textContent='Room ready (local): '+roomCode;if(dotEl)dotEl.style.background='#2ecc71';}
-  });
+    if(rows[0].status!=='waiting'){
+      setP2PStatus('Room is full or already started.','#e74c3c');
+      return;
+    }
+
+    p2pOpponent = rows[0].host_name||'Host';
+
+    // Claim the room as guest
+    await sbUpdate('chess_rooms','id=eq.'+p2pRoomId,{
+      guest_id:   p2pPlayerId,
+      guest_name: 'GUEST',
+      status:     'playing'
+    });
+
+    setP2PStatus('Connected! Starting…','#2ecc71');
+
+    // Connect realtime
+    p2pWS = sbRealtime(p2pRoomId, onP2PEvent);
+
+    setTimeout(()=>startP2PGame(),1000);
+
+  }catch(err){
+    setP2PStatus('Error: '+err.message,'#e74c3c');
+  }
 }
 
-function joinP2PGame(){
-  const code=document.getElementById('join-code-input').value.trim().toUpperCase();
-  if(code.length<6){alert('Enter the 6-character room code.');return;}
-  roomCode=code;
-  const statusEl=document.getElementById('wifi-status-text');
-  if(statusEl) statusEl.textContent='Connecting to '+code+'…';
-  loadPeerJS((fallback)=>{
-    if(fallback||!window.Peer){if(statusEl)statusEl.textContent='Connected! Starting…';setTimeout(()=>startGame('p2p',''),1000);return;}
-    try{
-      p2pPeer=new Peer({debug:0});
-      p2pPeer.on('open',()=>{
-        const conn=p2pPeer.connect('CHESSX_'+code,{reliable:true});
-        p2pConn=conn; setupP2PConn(conn);
-        conn.on('open',()=>{if(statusEl)statusEl.textContent='Connected! Starting…';setTimeout(()=>startP2PGame(),800);});
-        conn.on('error',()=>{if(statusEl)statusEl.textContent='Could not connect. Check code.';});
-      });
-    }catch(e){if(statusEl)statusEl.textContent='Connected!';setTimeout(()=>startGame('p2p',''),1000);}
-  });
+// ── Handle incoming events ──
+function onP2PEvent(event, payload){
+  if(!payload) return;
+
+  if(event==='p2p_move' && payload.player!==p2pPlayerId){
+    // Opponent moved — execute on our board
+    const mv=payload.move;
+    if(mv) executeMove(mv.fr,mv.fc,mv.r,mv.c,mv,true);
+    AUD.playMove();
+  }
+
+  if(event==='p2p_chat' && payload.player!==p2pPlayerId){
+    addGameChatMsg('Opponent: '+payload.msg,'opponent');
+  }
+
+  if(event==='p2p_resign' && payload.player!==p2pPlayerId){
+    showResult(p2pColor,'resign');
+  }
 }
 
-function setupP2PConn(conn){
-  conn.on('data',data=>{
-    if(data.type==='move'){executeMove(data.move.fr,data.move.fc,data.move.r,data.move.c,data.move,true);}
-    else if(data.type==='chat'){const el=document.getElementById('ai-chat-log');if(el){const d=document.createElement('div');d.className='chat-msg opponent';d.textContent='Opponent: '+data.msg;el.appendChild(d);el.scrollTop=el.scrollHeight;}}
-  });
-  conn.on('close',()=>{const el=document.getElementById('status-text');if(el)el.textContent='⚠ Opponent disconnected';});
-}
-
-function startP2PGame(){
-  p2pReady=true;
-  document.getElementById('p1-name').textContent=isHost?'YOU (WHITE)':'YOU (BLACK)';
-  document.getElementById('p2-name').textContent=isHost?'OPPONENT (BLACK)':'OPPONENT (WHITE)';
-  startGame('p2p','');
-}
-
+// ── Send our move to opponent ──
 function sendP2PMove(mv){
-  if(p2pConn&&p2pConn.open){try{p2pConn.send({type:'move',move:mv});}catch(e){}}
+  if(!p2pWS||p2pWS.readyState!==1) return;
+  p2pWS.sbSend('p2p_move',{player:p2pPlayerId, move:mv});
+  // Also save to DB for reconnection
+  sbUpdate('chess_rooms','id=eq.'+p2pRoomId,{
+    last_move:    JSON.stringify(mv),
+    current_turn: turn
+  }).catch(()=>{});
 }
 
-function copyRoomCode(){
-  navigator.clipboard?.writeText(roomCode).then(()=>{
-    const el=document.getElementById('wifi-status-text');
-    if(el){el.textContent='Copied! Share with friend.';setTimeout(()=>el.textContent='Ready to host',2000);}
-  });
+// ── Start the game ──
+function startP2PGame(){
+  p2pReady = true;
+  gameMode = 'p2p';
+
+  // Set player color
+  window.sbPlayerColor = p2pColor; // reuse online color system
+  window.sbBoardFlipped = (p2pColor==='b');
+
+  // Set names — YOUR side always at bottom (p1)
+  const myLabel  = p2pColor==='w' ? '⬜ YOU (White)' : '⬛ YOU (Black)';
+  const oppLabel = p2pColor==='w' ? '⬛ Opponent (Black)' : '⬜ Opponent (White)';
+  document.getElementById('p1-name').textContent = myLabel;
+  document.getElementById('p2-name').textContent = oppLabel;
+
+  initBoard();
+  clearInterval(timerInterval);
+  timers={w:600,b:600};
+  showScreen('game-screen');
+  renderBoard();
+  updateStatus();
+  startTimer();
+  AUD.startTheme();
+  showBannerAd();
+  showGameChatBtn();
+
+  setP2PStatus('Connected ✓','#2ecc71');
 }
 
-/* ══════════════════════════════════════════════════════════
-   REAL ONLINE MULTIPLAYER — SUPABASE REALTIME
-   Project: ChessX  |  idhuobzqiwrzrlwiqqat.supabase.co
-   
-   HOW IT WORKS:
-   1. Player clicks FIND MATCH — creates/joins a room in Supabase DB
-   2. Supabase Realtime broadcasts every move to the opponent instantly
-   3. Chat messages sync in real-time via the same channel
-   4. Both players see the SAME live board — true online chess
-══════════════════════════════════════════════════════════ */
-
-const SUPA_URL  = 'https://idhuobzqiwrzrlwiqqat.supabase.co';
-const SUPA_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaHVvYnpxaXdyenJsd2lxcWF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NzE5NDAsImV4cCI6MjA5NTU0Nzk0MH0._1-nGVdr6l58t9Be7EpnIReR_j2Hbog8nSVvhZ-HVgE';
-const SUPA_HDRS = {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};
-
-// ── Supabase REST helpers ──
-async function sbSelect(table, filter=''){
-  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?${filter}`, {headers:SUPA_HDRS});
-  return res.ok ? res.json() : [];
-}
-async function sbInsert(table, data){
-  const res = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
-    method:'POST', headers:{...SUPA_HDRS,'Prefer':'return=representation'},
-    body: JSON.stringify(data)
-  });
-  return res.ok ? res.json() : null;
-}
-async function sbUpdate(table, filter, data){
-  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?${filter}`, {
-    method:'PATCH', headers:{...SUPA_HDRS,'Prefer':'return=representation'},
-    body: JSON.stringify(data)
-  });
-  return res.ok ? res.json() : null;
-}
-async function sbDelete(table, filter){
-  await fetch(`${SUPA_URL}/rest/v1/${table}?${filter}`, {method:'DELETE', headers:SUPA_HDRS});
+// ── Cleanup ──
+function cleanupP2P(){
+  clearInterval(p2pPollTimer);
+  if(p2pWS){try{p2pWS.close();}catch(e){}}
+  p2pWS=null; p2pReady=false; p2pColor=null;
+  window.sbPlayerColor=null; window.sbBoardFlipped=false;
+  if(p2pRoomId) sbDelete('chess_rooms','id=eq.'+p2pRoomId+'&status=eq.waiting').catch(()=>{});
+  p2pRoomId=null;
 }
 
-// ── Supabase Realtime via WebSocket ──
-let realtimeWS = null;
-let realtimeChannel = null;
+// Legacy stubs (kept so nothing breaks)
+function loadPeerJS(cb){if(cb)cb(true);}
+function setupP2PConn(){}
 
-function sbRealtime(roomId, onEvent){
-  // Close any existing connection
-  if(realtimeWS){ try{realtimeWS.close();}catch(e){} }
 
-  const wsUrl = SUPA_URL.replace('https://','wss://') + '/realtime/v1/websocket?apikey=' + SUPA_KEY + '&vsn=1.0.0';
-  realtimeWS = new WebSocket(wsUrl);
-  let heartbeat = null;
 
-  realtimeWS.onopen = () => {
-    // Join the room channel
-    realtimeWS.send(JSON.stringify({
-      topic: 'realtime:chessx_room_' + roomId,
-      event: 'phx_join',
-      payload: {config:{broadcast:{self:false},presence:{key:''}}},
-      ref: '1'
-    }));
-    // Heartbeat every 20s to keep connection alive
-    heartbeat = setInterval(()=>{
-      if(realtimeWS.readyState===1){
-        realtimeWS.send(JSON.stringify({topic:'phoenix',event:'heartbeat',payload:{},ref:'hb'}));
-      }
-    }, 20000);
-    console.log('Supabase Realtime connected for room:', roomId);
-  };
 
-  realtimeWS.onmessage = (e) => {
-    try{
-      const msg = JSON.parse(e.data);
-      if(msg.event === 'broadcast' && msg.payload){
-        onEvent(msg.payload.event, msg.payload.payload);
-      }
-    }catch(err){}
-  };
-
-  realtimeWS.onclose = () => {
-    clearInterval(heartbeat);
-    console.log('Realtime disconnected');
-  };
-
-  // Broadcast a message to room
-  realtimeWS.sbSend = (event, payload) => {
-    if(realtimeWS.readyState !== 1) return;
-    realtimeWS.send(JSON.stringify({
-      topic: 'realtime:chessx_room_' + roomId,
-      event: 'broadcast',
-      payload: {event, payload},
-      ref: Date.now().toString()
-    }));
-  };
-
-  return realtimeWS;
+/* ══ NEXORA SPLASH ══ */
+function initNexoraSplash(){
+  const splash=document.getElementById('studio-splash');
+  if(!splash) return;
+  splash.addEventListener('click',dismissSplash);
+  const canvas=document.getElementById('splash-canvas');
+  if(!canvas) return;
+  const ctx2=canvas.getContext('2d');
+  let frame=0;
+  function sizeCanvases(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+  sizeCanvases();
+  window.addEventListener('resize',sizeCanvases);
+  function drawBG(phase){
+    ctx2.fillStyle='#000';ctx2.fillRect(0,0,canvas.width,canvas.height);
+    const cx=canvas.width/2,cy=canvas.height/2;
+    const glow=ctx2.createRadialGradient(cx,cy,0,cx,cy,Math.min(canvas.width,canvas.height)*0.4);
+    glow.addColorStop(0,`rgba(201,168,76,${0.15+Math.sin(phase)*0.05})`);
+    glow.addColorStop(1,'rgba(0,0,0,0)');
+    ctx2.fillStyle=glow;ctx2.fillRect(0,0,canvas.width,canvas.height);
+  }
+  function drawLogo(progress){
+    const cx=canvas.width/2,cy=canvas.height/2-30;
+    const size=Math.min(canvas.width,canvas.height)*0.22*Math.min(1,progress*1.5);
+    ctx2.save();ctx2.translate(cx,cy);
+    ctx2.font=`bold ${size}px Cinzel,serif`;ctx2.textAlign='center';ctx2.textBaseline='middle';
+    ctx2.fillStyle=`rgba(201,168,76,${Math.min(1,progress*2)})`;
+    ctx2.fillText('NEXORA',0,0);
+    ctx2.font=`${size*0.35}px Cinzel,serif`;
+    ctx2.fillStyle=`rgba(201,168,76,${Math.min(1,progress*2)*0.7})`;
+    ctx2.fillText('GAMING STUDIOS',0,size*0.7);
+    ctx2.font=`${size*0.22}px Cinzel,serif`;
+    ctx2.fillStyle=`rgba(201,168,76,${Math.min(1,progress*2)*0.5})`;
+    ctx2.fillText('IMAGINE · BUILD · CONQUER',0,size*1.1);
+    ctx2.restore();
+  }
+  let startTime=null;
+  const duration=3500;
+  function loop(ts){
+    if(!startTime) startTime=ts;
+    const elapsed=ts-startTime;
+    const progress=Math.min(1,elapsed/duration);
+    drawBG(elapsed/1000);
+    drawLogo(progress);
+    frame++;
+    if(elapsed<duration+1000 && splash.style.display!=='none'){
+      requestAnimationFrame(loop);
+    } else {
+      dismissSplash();
+    }
+  }
+  requestAnimationFrame(loop);
+  setTimeout(dismissSplash,5000);
 }
 
-// ── Online State ──
-let sbRoomId      = null;   // current room ID
-let sbPlayerId    = null;   // this player's unique ID
-let sbPlayerColor = null;   // 'w' = host, 'b' = guest
-let sbOpponentName= '';
-let sbIsSearching = false;
-let sbPollTimer   = null;
-let sbChatChannel = null;
+function dismissSplash(){
+  const splash=document.getElementById('studio-splash');
+  if(!splash||splash.style.display==='none') return;
+  splash.style.opacity='0';
+  setTimeout(()=>{splash.style.display='none';},350);
+}
+
+/* ══ STORY MODE ══ */
+const STORY_CHAPTERS=[
+  {title:'The Awakening',enemy:'Dark Squire',diff:'easy',
+   intro:'The kingdom falls to shadow. A lone warrior rises.',
+   lines:[{speaker:'NARRATOR',text:'The realm of ChessX has been plunged into darkness...'},
+          {speaker:'DARK KING',text:'Your army is nothing. Kneel before me!'},
+          {speaker:'YOU',text:'I will never kneel. My pieces stand ready!'}]},
+  {title:'The Iron Trial',enemy:'Iron Knight',diff:'easy',
+   intro:'The Iron Knight blocks the mountain pass.',
+   lines:[{speaker:'IRON KNIGHT',text:'None shall pass these gates. Turn back now!'},
+          {speaker:'YOU',text:'I fight for the people. Stand aside or face defeat!'}]},
+  {title:'The Dark Council',enemy:'Shadow Bishop',diff:'medium',
+   intro:'The Shadow Bishop commands the dark arts.',
+   lines:[{speaker:'SHADOW BISHOP',text:'You rely on brute force. I command the shadows!'},
+          {speaker:'YOU',text:'Light always defeats darkness. Prepare yourself!'}]},
+  {title:'The Final Battle',enemy:'Dark Warlord',diff:'hard',
+   intro:'The Dark Warlord awaits on his obsidian throne.',
+   lines:[{speaker:'DARK WARLORD',text:'So the hero arrives. Your journey ends here!'},
+          {speaker:'YOU',text:'This ends today. For the kingdom — CHARGE!'}]},
+];
+
+let storyChapter=0;
+let storyDialogIdx=0;
+
+function showStoryScreen(){
+  showScreen('story-screen');
+  renderStoryChapters();
+}
+
+function renderStoryChapters(){
+  const grid=document.getElementById('story-chapters');
+  if(!grid) return;
+  grid.innerHTML=STORY_CHAPTERS.map((ch,i)=>`
+    <div class="mode-card" onclick="startStoryChapter(${i})">
+      <div class="card-icon">${i===0?'📖':i===1?'⚔️':i===2?'🌑':'👑'}</div>
+      <div class="card-title">CH.${i+1}: ${ch.title.toUpperCase()}</div>
+      <div class="card-desc">${ch.intro}</div>
+    </div>`).join('');
+}
+
+function startStoryChapter(idx){
+  storyChapter=idx;
+  storyDialogIdx=0;
+  const ch=STORY_CHAPTERS[idx];
+  showStoryDialog();
+}
+
+function showStoryDialog(){
+  const ch=STORY_CHAPTERS[storyChapter];
+  const dlg=document.getElementById('story-dlg');
+  if(!dlg) return;
+  if(storyDialogIdx>=ch.lines.length){
+    // Start the game
+    dlg.style.display='none';
+    startGame('single',ch.diff);
+    return;
+  }
+  const line=ch.lines[storyDialogIdx];
+  const speaker=document.getElementById('dlg-speaker');
+  const text=document.getElementById('dlg-text');
+  if(speaker) speaker.textContent=line.speaker;
+  if(text) text.textContent=line.text;
+  dlg.style.display='flex';
+}
+
+function nextStoryDialog(){
+  storyDialogIdx++;
+  showStoryDialog();
+}
+
+function startStoryMode(){showScreen('story-screen');renderStoryChapters();}
+
+/* ══ SHOP FUNCTIONS ══ */
+function showComingSoon(){
+  const toast=document.createElement('div');
+  toast.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(135deg,#1c1006,#2a1808);border:2px solid var(--gold);border-radius:8px;padding:24px 32px;text-align:center;z-index:9999;min-width:260px;animation:mIn 0.3s ease;';
+  toast.innerHTML=`<div style="font-size:36px;margin-bottom:10px">🚀</div>
+    <div style="font-size:14px;color:var(--gold-light);font-family:Cinzel,serif;letter-spacing:2px;font-weight:700">COMING SOON</div>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.6">Full payments available<br>when ChessX launches on Google Play</div>
+    <div style="font-size:10px;color:var(--gold);margin-top:10px;letter-spacing:2px">FREE DURING BETA ✓</div>
+    <button onclick="this.parentNode.remove()" style="margin-top:14px;padding:8px 20px;background:rgba(201,168,76,0.15);border:1px solid var(--gold);border-radius:4px;color:var(--gold);font-family:Cinzel,serif;font-size:10px;letter-spacing:2px;cursor:pointer">OK</button>`;
+  document.body.appendChild(toast);
+  setTimeout(()=>{if(toast.parentNode)toast.remove();},4000);
+}
+
+function previewTheme(theme){
+  applyBoardTheme(theme);
+  const toast=document.createElement('div');
+  toast.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.85);border:1px solid var(--gold);border-radius:6px;padding:10px 18px;z-index:9999;font-size:11px;color:var(--gold-light);letter-spacing:2px;font-family:Cinzel,serif;text-align:center;';
+  toast.textContent='✓ '+theme.toUpperCase()+' THEME APPLIED';
+  document.body.appendChild(toast);
+  setTimeout(()=>{if(toast.parentNode)toast.remove();},2000);
+}
+
+/* ══ RANKING SYSTEM ══ */
+const RANK_TIERS=[
+  {name:'GrandMaster',min:2200,emoji:'🔱',color:'#ff6b35'},
+  {name:'Master',     min:2000,emoji:'👑',color:'#9b59b6'},
+  {name:'Diamond',    min:1800,emoji:'💎',color:'#00d2ff'},
+  {name:'Gold',       min:1600,emoji:'🥇',color:'#FFD700'},
+  {name:'Silver',     min:1400,emoji:'🥈',color:'#C0C0C0'},
+  {name:'Bronze',     min:1200,emoji:'🥉',color:'#CD7F32'},
+  {name:'Iron',       min:1000,emoji:'⚔️',color:'#7f8c8d'},
+  {name:'Stone',      min:0,   emoji:'🪨',color:'#5d6d7e'},
+];
+
+function getRankTier(rating){
+  for(const t of RANK_TIERS) if(rating>=t.min) return t;
+  return RANK_TIERS[RANK_TIERS.length-1];
+}
+
+function getRankProgress(rating){
+  const tier=getRankTier(rating);
+  const idx=RANK_TIERS.indexOf(tier);
+  if(idx===0) return 100;
+  const next=RANK_TIERS[idx-1];
+  return Math.min(100,Math.max(0,Math.round(((rating-tier.min)/(next.min-tier.min))*100)));
+}
+
+function calcELO(myR,oppR,result){
+  const K=myR<1400?32:myR<1800?24:16;
+  const exp=1/(1+Math.pow(10,(oppR-myR)/400));
+  return Math.round(K*(result-exp));
+}
+
+function getMyPlayerData(){
+  try{const s=localStorage.getItem('chessx_player_data');if(s)return JSON.parse(s);}catch(e){}
+  return{id:'p_'+Date.now()+'_'+Math.random().toString(36).substr(2,8),name:'Commander',rating:1200,wins:0,losses:0,draws:0,games:0,country:'ae',history:[]};
+}
+
+function saveMyPlayerData(data){
+  try{localStorage.setItem('chessx_player_data',JSON.stringify(data));}catch(e){}
+}
+
+async function syncPlayerToSupabase(data){
+  try{
+    const ex=await sbSelect('players','id=eq.'+data.id);
+    if(ex&&ex.length>0) await sbUpdate('players','id=eq.'+data.id,{name:data.name,rating:data.rating,wins:data.wins,losses:data.losses,draws:data.draws,games:data.games});
+    else await sbInsert('players',{id:data.id,name:data.name,rating:data.rating,wins:data.wins,losses:data.losses,draws:data.draws,games:data.games});
+  }catch(e){}
+}
+
+async function updateRankedRating(result,oppRating,oppName){
+  const data=getMyPlayerData();
+  const oldR=data.rating;
+  const oldT=getRankTier(oldR);
+  const score=result==='win'?1:result==='draw'?0.5:0;
+  const change=calcELO(data.rating,oppRating,score);
+  data.rating=Math.max(100,data.rating+change);
+  if(result==='win')data.wins++;else if(result==='loss')data.losses++;else data.draws++;
+  data.games++;data.name=getPlayerName();
+  data.history.unshift({change,oppName,result,rating:data.rating,date:Date.now()});
+  if(data.history.length>20)data.history.pop();
+  saveMyPlayerData(data);
+  syncPlayerToSupabase(data).catch(()=>{});
+  const rEl=document.getElementById('player-rating');
+  if(rEl)rEl.textContent=data.rating;
+  const newT=getRankTier(data.rating);
+  showRatingChange(oldR,data.rating,change,newT,newT.min>oldT.min,newT.min<oldT.min);
+  return{oldRating:oldR,newRating:data.rating,change,newTier:newT,promoted:newT.min>oldT.min};
+}
+
+function showRatingChange(oldR,newR,change,tier,promoted,demoted){
+  const modal=document.getElementById('result-modal');if(!modal)return;
+  const ex=document.getElementById('rating-change-block');if(ex)ex.remove();
+  const block=document.createElement('div');block.id='rating-change-block';block.className='rating-change-wrap';
+  block.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between">
+    <div><div class="rc-old">Rating: ${oldR}</div><div class="rc-new">${tier.emoji} ${newR}</div>
+    <div class="rc-delta ${change>=0?'up':'down'}">${change>=0?'+':''}${change} pts</div></div>
+    <div style="text-align:right"><div style="font-size:36px">${tier.emoji}</div>
+    <div style="font-size:9px;color:${tier.color};letter-spacing:2px">${tier.name.toUpperCase()}</div></div></div>
+    ${promoted?`<div style="color:#2ecc71;font-size:10px;letter-spacing:2px;margin-top:6px;text-align:center">🎉 PROMOTED TO ${tier.name.toUpperCase()}!</div>`:''}`;
+  const desc=document.getElementById('res-desc');
+  if(desc&&desc.parentNode)desc.parentNode.insertBefore(block,desc.nextSibling);
+  if(promoted)setTimeout(()=>showRankUpToast(tier,newR,change),1500);
+}
+
+function showRankUpToast(tier,rating,change){
+  const toast=document.getElementById('rank-up-toast');if(!toast)return;
+  document.getElementById('toast-badge').textContent=tier.emoji;
+  document.getElementById('toast-title').textContent='RANK UP!';
+  document.getElementById('toast-rating').textContent=rating;
+  document.getElementById('toast-delta').textContent='+'+change+' points';
+  document.getElementById('toast-tier').textContent='PROMOTED TO '+tier.name.toUpperCase()+'!';
+  toast.style.display='flex';toast.style.flexDirection='column';toast.style.alignItems='center';
+  setTimeout(()=>{toast.style.display='none';},8000);
+}
+
+async function handleRankedGameEnd(winner,reason){
+  if(window._currentOnlineTab!=='ranked') return;
+  const myColor=sbPlayerColor;
+  const oppRating=window._sbOpponentRating||1200;
+  const oppName=sbOpponentName||'Opponent';
+  let result=reason==='stalemate'||reason==='draw'?'draw':(winner==='w'&&myColor==='w')||(winner==='b'&&myColor==='b')?'win':'loss';
+  await updateRankedRating(result,oppRating,oppName);
+}
+
+function storeOpponentRating(r){window._sbOpponentRating=parseInt(r)||1200;}
+
+async function loadLeaderboard(type='global'){
+  document.querySelectorAll('.lb-tab').forEach(t=>t.classList.remove('active'));
+  const tabEl=document.getElementById('lbt-'+type);if(tabEl)tabEl.classList.add('active');
+  const listEl=document.getElementById('lb-list');
+  if(listEl)listEl.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-dim);font-family:sans-serif;font-size:12px">⏳ Loading…</div>';
+  const myData=getMyPlayerData();
+  updateMyRankCard(myData);
+  try{
+    const players=await sbSelect('players','order=rating.desc&limit=50');
+    if(!players||players.length===0){
+      if(listEl)listEl.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-dim);font-family:sans-serif;font-size:12px">No ranked players yet!<br><span style="color:var(--gold)">Play Ranked matches to appear here.</span></div>';
+      return;
+    }
+    const myPos=players.findIndex(p=>p.id===myData.id);
+    const myRankPos=document.getElementById('my-rank-pos');
+    if(myRankPos)myRankPos.textContent=myPos>=0?'#'+(myPos+1):'#—';
+    if(listEl){
+      listEl.innerHTML=players.map((p,idx)=>{
+        const tier=getRankTier(p.rating||1200);
+        const isMe=p.id===myData.id;
+        const posIcon=idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':'';
+        const wl=p.wins&&p.losses?`${p.wins}W / ${p.losses}L`:'';
+        return`<div class="lb-row ${isMe?'me':''}">
+          <div class="lb-pos ${idx<3?'top'+(idx+1):''}">${posIcon||'#'+(idx+1)}</div>
+          <div class="lb-badge">${tier.emoji}</div>
+          <div class="lb-info"><div class="lb-name">${p.name||'Player'}${isMe?' (You)':''}</div>
+          <div class="lb-rank-name" style="color:${tier.color}">${tier.name.toUpperCase()}</div></div>
+          <div><div class="lb-rating">${p.rating||1200}</div><div class="lb-wl">${wl}</div></div></div>`;
+      }).join('');
+    }
+  }catch(e){
+    if(listEl)listEl.innerHTML='<div style="text-align:center;padding:20px;color:#e74c3c;font-family:sans-serif;font-size:11px">Could not load rankings.</div>';
+  }
+}
+
+function updateMyRankCard(data){
+  const tier=getRankTier(data.rating);
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('my-rank-emoji',tier.emoji);set('my-rank-tier-name',tier.name.toUpperCase());
+  set('my-rank-player-name',data.name||'Commander');set('my-rank-rating',data.rating);
+  set('my-rank-wins',data.wins||0);set('my-rank-losses',data.losses||0);set('my-rank-draws',data.draws||0);
+  const badge=document.getElementById('my-rank-badge-big');
+  if(badge)badge.style.borderColor=tier.color;
+}
+
+function savePlayerProfile(){
+  const name=document.getElementById('player-display-name')?.value?.trim()||'Commander';
+  const country=document.getElementById('player-country')?.value||'ae';
+  const data=getMyPlayerData();data.name=name;data.country=country;saveMyPlayerData(data);
+  updateAvatarFlag(country);
+  const t=getRankTier(data.rating);
+  const re2=document.getElementById('player-rank-emoji');if(re2)re2.textContent=t.emoji;
+}
+
+function initPlayerRankData(){
+  const data=getMyPlayerData();
+  loadPlayerProfile();
+  if(data.games>0)syncPlayerToSupabase(data).catch(()=>{});
+}
+
+/* ══ IN-GAME CHAT ══ */
+let gameChatOpen=false,gameChatUnread=0;
+
+function toggleGameChat(){
+  gameChatOpen=!gameChatOpen;
+  const panel=document.getElementById('game-chat-panel');
+  if(panel)panel.style.display=gameChatOpen?'block':'none';
+  if(gameChatOpen){gameChatUnread=0;updateChatBadge();const log=document.getElementById('game-chat-log');if(log)log.scrollTop=log.scrollHeight;}
+}
+
+function showGameChatBtn(){
+  const btn=document.getElementById('chat-toggle-btn');if(btn)btn.style.display='inline-flex';
+}
+
+function hideGameChatBtn(){
+  const btn=document.getElementById('chat-toggle-btn');if(btn)btn.style.display='none';
+  const panel=document.getElementById('game-chat-panel');if(panel)panel.style.display='none';
+  gameChatOpen=false;
+}
+
+function addGameChatMsg(msg,type='opponent'){
+  const log=document.getElementById('game-chat-log');if(!log)return;
+  const div=document.createElement('div');div.className='chat-msg '+type;div.textContent=msg;
+  log.appendChild(div);log.scrollTop=log.scrollHeight;
+  if(!gameChatOpen&&type==='opponent'){gameChatUnread++;updateChatBadge();}
+}
+
+function updateChatBadge(){
+  const btn=document.getElementById('chat-toggle-btn');if(!btn)return;
+  if(gameChatUnread>0){btn.textContent='💬 CHAT ('+gameChatUnread+')';btn.style.color='#e74c3c';btn.style.borderColor='#e74c3c';}
+  else{btn.textContent='💬 CHAT';btn.style.color='';btn.style.borderColor='';}
+}
+
+function sendGameChat(){
+  const inp=document.getElementById('game-chat-input');
+  const msg=(inp?.value||'').trim();if(!msg)return;
+  inp.value='';addGameChatMsg(getPlayerFlag()+' You: '+msg,'you');
+  if(gameMode==='supabase'&&realtimeWS?.readyState===1) realtimeWS.sbSend('chat',{player:sbPlayerId,msg});
+  if(gameMode==='p2p'&&p2pWS?.readyState===1) p2pWS.sbSend('p2p_chat',{player:p2pPlayerId,msg});
+}
+
+function sendGameQuickReply(msg){const inp=document.getElementById('game-chat-input');if(inp)inp.value=msg;sendGameChat();}
+
+
+/* ══ COUNTRIES + PLAYER PROFILE ══ */
+const COUNTRIES=[
+  {code:'ae',flag:'🇦🇪',name:'UAE'},{code:'us',flag:'🇺🇸',name:'USA'},
+  {code:'gb',flag:'🇬🇧',name:'UK'},{code:'in',flag:'🇮🇳',name:'India'},
+  {code:'pk',flag:'🇵🇰',name:'Pakistan'},{code:'sa',flag:'🇸🇦',name:'Saudi Arabia'},
+  {code:'eg',flag:'🇪🇬',name:'Egypt'},{code:'ng',flag:'🇳🇬',name:'Nigeria'},
+  {code:'de',flag:'🇩🇪',name:'Germany'},{code:'fr',flag:'🇫🇷',name:'France'},
+  {code:'es',flag:'🇪🇸',name:'Spain'},{code:'it',flag:'🇮🇹',name:'Italy'},
+  {code:'br',flag:'🇧🇷',name:'Brazil'},{code:'mx',flag:'🇲🇽',name:'Mexico'},
+  {code:'ca',flag:'🇨🇦',name:'Canada'},{code:'au',flag:'🇦🇺',name:'Australia'},
+  {code:'ru',flag:'🇷🇺',name:'Russia'},{code:'cn',flag:'🇨🇳',name:'China'},
+  {code:'jp',flag:'🇯🇵',name:'Japan'},{code:'kr',flag:'🇰🇷',name:'South Korea'},
+  {code:'tr',flag:'🇹🇷',name:'Turkey'},{code:'ir',flag:'🇮🇷',name:'Iran'},
+  {code:'iq',flag:'🇮🇶',name:'Iraq'},{code:'jo',flag:'🇯🇴',name:'Jordan'},
+  {code:'kw',flag:'🇰🇼',name:'Kuwait'},{code:'qa',flag:'🇶🇦',name:'Qatar'},
+  {code:'om',flag:'🇴🇲',name:'Oman'},{code:'bh',flag:'🇧🇭',name:'Bahrain'},
+  {code:'lb',flag:'🇱🇧',name:'Lebanon'},{code:'ma',flag:'🇲🇦',name:'Morocco'},
+  {code:'dz',flag:'🇩🇿',name:'Algeria'},{code:'za',flag:'🇿🇦',name:'South Africa'},
+  {code:'id',flag:'🇮🇩',name:'Indonesia'},{code:'my',flag:'🇲🇾',name:'Malaysia'},
+  {code:'ph',flag:'🇵🇭',name:'Philippines'},{code:'th',flag:'🇹🇭',name:'Thailand'},
+  {code:'bd',flag:'🇧🇩',name:'Bangladesh'},{code:'np',flag:'🇳🇵',name:'Nepal'},
+  {code:'ar',flag:'🇦🇷',name:'Argentina'},{code:'nl',flag:'🇳🇱',name:'Netherlands'},
+  {code:'se',flag:'🇸🇪',name:'Sweden'},{code:'pl',flag:'🇵🇱',name:'Poland'},
+  {code:'pt',flag:'🇵🇹',name:'Portugal'},{code:'gr',flag:'🇬🇷',name:'Greece'},
+  {code:'ua',flag:'🇺🇦',name:'Ukraine'},{code:'vn',flag:'🇻🇳',name:'Vietnam'},
+];
+
+function buildCountrySelect(){
+  const sel=document.getElementById('player-country');
+  if(!sel)return;
+  sel.innerHTML=COUNTRIES.map(c=>`<option value="${c.code}">${c.flag} ${c.name}</option>`).join('');
+}
+
+function updateAvatarFlag(code){
+  const c=COUNTRIES.find(x=>x.code===code);
+  const av=document.getElementById('player-avatar-flag');
+  if(av&&c)av.textContent=c.flag;
+}
+
+function getPlayerFlag(){
+  const data=getMyPlayerData();
+  const c=COUNTRIES.find(x=>x.code===(data.country||'ae'));
+  return c?c.flag:'🌍';
+}
 
 function getPlayerName(){
-  const saved = getMyPlayerData();
-  const inputVal = document.getElementById('player-display-name')?.value?.trim();
-  return (inputVal || saved.name || 'Commander').substring(0,16) || 'Commander';
+  const saved=getMyPlayerData();
+  const inputVal=document.getElementById('player-display-name')?.value?.trim();
+  return(inputVal||saved.name||'Commander').substring(0,16)||'Commander';
 }
+
 function getPlayerRating(){
   return parseInt(document.getElementById('player-rating')?.textContent)||1200;
 }
 
-// ── UI helpers ──
-function sbAddChat(msg, type='opponent'){
-  const el=document.getElementById('ai-chat-log'); if(!el)return;
-  const div=document.createElement('div');div.className='chat-msg '+type;
-  div.textContent=msg; el.appendChild(div); el.scrollTop=el.scrollHeight;
+function loadPlayerProfile(){
+  const data=getMyPlayerData();
+  const nameEl=document.getElementById('player-display-name');
+  if(nameEl&&data.name)nameEl.value=data.name;
+  buildCountrySelect();
+  const sel=document.getElementById('player-country');
+  if(sel&&data.country)sel.value=data.country;
+  updateAvatarFlag(data.country||'ae');
+  const rEl=document.getElementById('player-rating');
+  if(rEl)rEl.textContent=data.rating||1200;
+  const t=getRankTier(data.rating||1200);
+  const re2=document.getElementById('player-rank-emoji');
+  if(re2)re2.textContent=t.emoji;
 }
+
+/* ══ ONLINE MULTIPLAYER UI HELPERS ══ */
+function sbAddChat(msg,type='opponent'){
+  const el=document.getElementById('ai-chat-log');if(!el)return;
+  const div=document.createElement('div');div.className='chat-msg '+type;
+  div.textContent=msg;el.appendChild(div);el.scrollTop=el.scrollHeight;
+}
+
 function sbSystemMsg(msg){
-  const el=document.getElementById('ai-chat-log'); if(!el)return;
+  const el=document.getElementById('ai-chat-log');if(!el)return;
   const div=document.createElement('div');
   div.style.cssText='font-size:9px;color:rgba(201,168,76,0.5);font-family:sans-serif;text-align:center;padding:3px 0;letter-spacing:1px';
-  div.textContent='— '+msg+' —'; el.appendChild(div); el.scrollTop=el.scrollHeight;
+  div.textContent='— '+msg+' —';el.appendChild(div);el.scrollTop=el.scrollHeight;
 }
-function setMMWrap(html2){ const w=document.getElementById('mm-wrap'); if(w)w.innerHTML=html2; }
-function showMMSearching(elapsed, detail){
-  setMMWrap(`
-    <div style="text-align:center;padding:12px 0">
-      <div class="mm-ring"></div>
-      <div class="mm-status" style="margin-top:10px">SEARCHING FOR OPPONENT…</div>
-      <div style="font-size:10px;color:var(--text-dim);margin-top:5px;font-family:sans-serif">${detail}</div>
-      <div style="font-size:9px;color:var(--text-dim);letter-spacing:2px;margin-top:8px">${elapsed}s elapsed</div>
-      <button class="back-btn" onclick="cancelRealMatchmaking()" style="margin-top:12px;font-size:10px;padding:6px 16px">✕ Cancel</button>
-    </div>`);
-}
-function showMMFound(name, rating, color){
-  setMMWrap(`
-    <div style="text-align:center;padding:8px 0;animation:mIn 0.4s ease">
-      <div style="font-size:32px;margin-bottom:8px">${color==='w'?'♔':'♚'}</div>
-      <div style="font-size:18px;color:var(--gold-light);font-family:Cinzel,serif;letter-spacing:3px;font-weight:700">${name}</div>
-      <div style="font-size:10px;color:var(--text-dim);margin-top:4px">Rating: ${rating}</div>
-      <div style="font-size:10px;color:var(--gold);margin-top:4px;letter-spacing:2px">YOU PLAY AS ${color==='w'?'⬜ WHITE':'⬛ BLACK'}</div>
-      <div style="margin-top:10px;font-size:10px;color:#2ecc71;letter-spacing:2px;animation:pulse 1s infinite">● STARTING GAME…</div>
-    </div>`);
-}
+
 function resetMMWrap(){
-  setMMWrap('<button class="mp-btn" onclick="startRealMatchmaking()" style="padding:12px 40px;font-size:13px;letter-spacing:3px;width:100%">⚔ FIND MATCH</button>');
+  const tab=window._currentOnlineTab||'quick';
+  const w=document.getElementById('mm-wrap');
+  if(w)w.innerHTML=`<button class="mp-btn" onclick="startRealMatchmaking()"
+    style="padding:12px 40px;font-size:13px;letter-spacing:3px;width:100%">
+    ⚔ FIND ${tab==='ranked'?'RANKED ':''}MATCH</button>`;
 }
 
-// ── MATCHMAKING ──
-async function startRealMatchmaking(){
-  if(sbIsSearching) return;
-  sbIsSearching = true;
-  sbPlayerId    = 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
-  const myName  = getPlayerName();
-  const myRating= getPlayerRating();
-  let elapsed   = 0;
+function showMMSearching(elapsed,detail){
+  const w=document.getElementById('mm-wrap');if(!w)return;
+  w.innerHTML=`<div style="text-align:center;padding:12px 0">
+    <div class="mm-ring"></div>
+    <div class="mm-status" style="margin-top:10px">SEARCHING…</div>
+    <div style="font-size:10px;color:var(--text-dim);margin-top:5px;font-family:sans-serif">${detail}</div>
+    <div style="font-size:9px;color:var(--text-dim);letter-spacing:2px;margin-top:8px">${elapsed}s elapsed</div>
+    <button class="back-btn" onclick="cancelRealMatchmaking()" style="margin-top:12px;font-size:10px;padding:6px 16px">✕ Cancel</button>
+  </div>`;
+}
 
-  document.getElementById('sb-status-dot').style.color='#2ecc71';
-  showMMSearching(0, 'Connecting to server…');
+function showMMFound(name,rating,color){
+  const w=document.getElementById('mm-wrap');if(!w)return;
+  w.innerHTML=`<div style="text-align:center;padding:8px 0;animation:mIn 0.4s ease">
+    <div style="font-size:32px;margin-bottom:8px">${color==='w'?'♔':'♚'}</div>
+    <div style="font-size:18px;color:var(--gold-light);font-family:Cinzel,serif;letter-spacing:3px;font-weight:700">${name}</div>
+    <div style="font-size:10px;color:var(--text-dim);margin-top:4px">Rating: ${rating}</div>
+    <div style="font-size:10px;color:var(--gold);margin-top:4px;letter-spacing:2px">YOU PLAY AS ${color==='w'?'⬜ WHITE':'⬛ BLACK'}</div>
+    <div style="margin-top:10px;font-size:10px;color:#2ecc71;letter-spacing:2px;animation:pulse 1s infinite">● STARTING GAME…</div>
+  </div>`;
+}
 
-  // Elapsed counter
-  const elTimer = setInterval(()=>{
-    elapsed++;
-    if(sbIsSearching) showMMSearching(elapsed, elapsed<5?'Scanning for opponents…':elapsed<15?'Looking worldwide…':'Still searching… hang tight!');
-  }, 1000);
+function sendChat(){
+  const inp=document.getElementById('chat-input');
+  const msg=(inp?.value||'').trim();if(!msg)return;
+  inp.value='';
+  sbAddChat(getPlayerFlag()+' You: '+msg,'you');
+  if(gameMode==='supabase'&&realtimeWS?.readyState===1)
+    realtimeWS.sbSend('chat',{player:sbPlayerId,msg});
+}
 
-  try{
-    // ── STEP 1: Clean up own stale rooms first ──
-    // Delete any old waiting rooms this player left behind
-    await sbDelete('chess_rooms', 'host_id=eq.'+sbPlayerId+'&status=eq.waiting').catch(()=>{});
+function quickReply(msg){
+  const inp=document.getElementById('chat-input');
+  if(inp)inp.value=msg;
+  sendChat();
+}
 
-    // ── STEP 2: Wait briefly then try to join existing room ──
-    // Small delay lets host insert room before guest searches
-    await new Promise(res=>setTimeout(res, 800));
-    let joined = false;
-    let attempts = 0;
+/* ══ ONLINE REALTIME HANDLERS ══ */
+function connectRealtime(roomId){
+  realtimeWS=sbRealtime(roomId,(event,payload)=>{
+    if(event==='move'&&payload.player!==sbPlayerId) onRemoteMove(payload);
+    if(event==='chat'&&payload.player!==sbPlayerId) onRemoteChat(payload);
+    if(event==='resign'&&payload.player!==sbPlayerId) onRemoteResign();
+    if(event==='offer_draw') onDrawOffer();
+    if(event==='timer_sync'&&payload.player!==sbPlayerId) onTimerSync(payload);
+  });
+}
 
-    while(!joined && attempts < 5){
-      attempts++;
+function onRemoteMove(payload){
+  const mv=payload.move;if(!mv)return;
+  executeMove(mv.fr,mv.fc,mv.r,mv.c,mv,true);
+  AUD.playMove();
+}
 
-      // Get ALL waiting rooms — no mode filter to maximize connection chance
-      const open = await sbSelect('chess_rooms',
-        'status=eq.waiting&order=created_at.asc&limit=20'
-      );
+function onRemoteChat(payload){
+  const msg=sbOpponentName+': '+payload.msg;
+  sbAddChat(msg,'opponent');
+  addGameChatMsg(msg,'opponent');
+  AUD.playMove();
+}
 
-      if(!open || open.length === 0) break; // no rooms → become host
+function onRemoteResign(){
+  sbSystemMsg(sbOpponentName+' resigned!');
+  showResult('w'===sbPlayerColor?'w':'b','resign');
+}
 
-      // Filter out own rooms and very old rooms (>5 min stale)
-      const now = Date.now();
-      const validRooms = (open||[]).filter(r =>
-        r.host_id !== sbPlayerId &&
-        (now - new Date(r.created_at).getTime()) < 300000 // less than 5 min old
-      );
+function onDrawOffer(){sbSystemMsg(sbOpponentName+' offers a draw');}
 
-      if(validRooms.length === 0) break;
-
-      // Try to claim the first valid room atomically
-      // Update only if status is STILL 'waiting' (prevents double-join)
-      for(const room of validRooms){
-        try{
-          const result = await sbUpdate('chess_rooms',
-            'id=eq.'+room.id+'&status=eq.waiting', // double-check still waiting
-            {
-              guest_id:     sbPlayerId,
-              guest_name:   myName,
-              guest_rating: myRating,
-              status:       'playing'
-            }
-          );
-
-          // Check if update succeeded
-          // Supabase returns updated rows — if we got data back, we claimed it
-          if(result && result.length > 0){
-            // Successfully joined!
-            sbRoomId       = room.id;
-            sbPlayerColor  = 'b';
-            sbOpponentName = room.host_name || 'Opponent';
-            joined         = true;
-
-            clearInterval(elTimer);
-            showMMFound(sbOpponentName, room.host_rating||1200, 'b');
-            connectRealtime(sbRoomId);
-
-            setTimeout(()=>{
-              if(sbIsSearching) startOnlineGame('b', sbOpponentName);
-            }, 1500);
-            break;
-          }
-          // else: someone else grabbed this room first, try next
-        } catch(e){
-          continue; // room was taken, try next
-        }
-      }
-
-      if(!joined){
-        // Small delay before retry to reduce race conditions
-        await new Promise(res=>setTimeout(res, 800));
-      }
-    }
-
-    if(!joined){
-      // ── STEP 3: Become host — create a new room ──
-      sbRoomId      = 'r_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
-      sbPlayerColor = 'w';
-
-      const matchMode = window._currentOnlineTab || 'quick';
-      await sbInsert('chess_rooms', {
-        id:           sbRoomId,
-        host_id:      sbPlayerId,
-        host_name:    myName,
-        host_rating:  myRating,
-        status:       'waiting',
-        board_state:  '',
-        current_turn: 'w',
-        last_move:    '',
-        mode:         matchMode
-      });
-
-      // Connect realtime AFTER room is created in DB
-      connectRealtime(sbRoomId);
-      showMMSearching(elapsed, 'Waiting for opponent…');
-
-      // Poll every 1.5s for guest joining (faster detection)
-      let pollCount = 0;
-      sbPollTimer = setInterval(async()=>{
-        if(!sbIsSearching){ clearInterval(sbPollTimer); return; }
-        pollCount++;
-        try{
-          const rows = await sbSelect('chess_rooms', 'id=eq.'+sbRoomId);
-          if(rows && rows.length > 0){
-            if(rows[0].status === 'playing' && rows[0].guest_id){
-              clearInterval(sbPollTimer);
-              clearInterval(elTimer);
-              sbOpponentName = rows[0].guest_name || 'Opponent';
-              storeOpponentRating(rows[0].guest_rating||1200);
-            showMMFound(sbOpponentName, rows[0].guest_rating||1200, 'w');
-              setTimeout(()=>{
-                if(sbIsSearching) startOnlineGame('w', sbOpponentName);
-              }, 1500);
-            }
-          } else {
-            // Room was deleted (stale cleanup) — recreate
-            if(pollCount > 10) cancelRealMatchmaking();
-          }
-        } catch(e){}
-      }, 1500);
-
-      // Timeout after 90s
-      setTimeout(()=>{
-        if(sbIsSearching && sbPlayerColor==='w'){
-          clearInterval(sbPollTimer);
-          clearInterval(elTimer);
-          sbDelete('chess_rooms','id=eq.'+sbRoomId).catch(()=>{});
-          sbIsSearching = false;
-          resetMMWrap();
-          sbSystemMsg('No opponent found after 90s — try again!');
-        }
-      }, 90000);
-    }
-
-  } catch(err){
-    clearInterval(elTimer);
-    console.error('Matchmaking error:', err);
-    // Show error but STAY on online screen - don't go to main menu
-    sbIsSearching = false;
-    resetMMWrap();
-    document.getElementById('sb-status-dot').style.color='#e74c3c';
-    // Show friendly error message
-    const errMsg = err.message||'Unknown error';
-    if(errMsg.includes('fetch')||errMsg.includes('network')||errMsg.includes('Failed')){
-      sbSystemMsg('No internet connection — check your WiFi and try again');
-    } else {
-      sbSystemMsg('Connection error — please try again');
-    }
-    // Show retry button
-    const mmw = document.getElementById('mm-wrap');
-    if(mmw) mmw.innerHTML = `
-      <div style="text-align:center;padding:10px">
-        <div style="font-size:28px;margin-bottom:8px">📡</div>
-        <div style="font-size:11px;color:#e74c3c;letter-spacing:2px;margin-bottom:12px">CONNECTION FAILED</div>
-        <button class="mp-btn" onclick="startRealMatchmaking()"
-          style="padding:10px 30px;font-size:12px;letter-spacing:2px;width:100%">
-          🔄 TRY AGAIN
-        </button>
-      </div>`;
+function onTimerSync(payload){
+  if(sbPlayerColor==='b'){
+    timers.w=payload.wTime;timers.b=payload.bTime;
+    updateTimerDisplay();
   }
 }
 
-// ── Clean up stale rooms on page load ──
-async function cleanStaleRooms(){
-  try{
-    // Delete waiting rooms older than 3 minutes
-    const stale = await sbSelect('chess_rooms',
-      'status=eq.waiting&order=created_at.asc'
-    );
-    if(!stale) return;
-    const now = Date.now();
-    for(const r of stale){
-      if((now - new Date(r.created_at).getTime()) > 180000){
-        await sbDelete('chess_rooms','id=eq.'+r.id).catch(()=>{});
-      }
-    }
-  } catch(e){}
-}
-
-
-// ── Friend room (direct invite) ──
-// Called when player clicks GENERATE MY CODE button
+/* ══ FRIEND ROOM ══ */
 async function generateAndShowFriendCode(){
-  // If already has a code, just show it
-  const existingCode = document.getElementById('friend-room-code')?.textContent;
-  if(existingCode && existingCode !== '------'){
-    sbSystemMsg('Your code: '+existingCode+' — share it!');
-    return;
-  }
+  const ex=document.getElementById('friend-room-code')?.textContent;
+  if(ex&&ex!=='------'){sbSystemMsg('Your code: '+ex+' — share it!');return;}
   await startFriendRoom();
 }
 
 async function startFriendRoom(){
-  // Generate clean 6-char alphanumeric code (no confusing chars like 0,O,I,1)
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const code = Array.from({length:6},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
-  sbRoomId      = code;
-  sbPlayerColor = 'w';
-  sbPlayerId    = 'p_'+Date.now();
-  const myName  = getPlayerName();
-
-  await sbInsert('chess_rooms',{
-    id:code, host_id:sbPlayerId, host_name:myName,
-    host_rating:getPlayerRating(), status:'waiting',
-    board_state:'', current_turn:'w', last_move:''
-  });
-
-  document.getElementById('friend-room-code').textContent = code;
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const code=Array.from({length:6},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
+  sbRoomId=code;sbPlayerColor='w';sbPlayerId='p_'+Date.now();
+  const myName=getPlayerName();
+  await sbInsert('chess_rooms',{id:code,host_id:sbPlayerId,host_name:myName,
+    host_rating:getPlayerRating(),status:'waiting',board_state:'',current_turn:'w',last_move:'',mode:'friend'});
+  const codeEl=document.getElementById('friend-room-code');
+  if(codeEl)codeEl.textContent=code;
   connectRealtime(code);
-
-  // Poll for guest
-  sbPollTimer = setInterval(async()=>{
-    const rows = await sbSelect('chess_rooms','id=eq.'+code);
+  sbPollTimer=setInterval(async()=>{
+    const rows=await sbSelect('chess_rooms','id=eq.'+code);
     if(rows?.[0]?.status==='playing'){
       clearInterval(sbPollTimer);
-      sbOpponentName = rows[0].guest_name||'Friend';
-      showMMFound(sbOpponentName, rows[0].guest_rating||1200, 'w');
+      sbOpponentName=rows[0].guest_name||'Friend';
+      storeOpponentRating(rows[0].guest_rating||1200);
+      showMMFound(sbOpponentName,rows[0].guest_rating||1200,'w');
       setTimeout(()=>startOnlineGame('w',sbOpponentName),1500);
     }
   },2000);
 }
 
 async function joinFriendRoom(){
-  const code = (document.getElementById('friend-join-input')?.value||'').toUpperCase().trim();
-  if(code.length !== 6){ sbSystemMsg('Please enter the full 6-character code'); return; }
-  sbRoomId       = code;
-  sbPlayerColor  = 'b';
-  sbPlayerId     = 'p_'+Date.now();
-  const myName   = getPlayerName();
-
-  const rows = await sbSelect('chess_rooms','id=eq.'+code);
-  if(!rows||rows.length===0){ sbSystemMsg('Room not found. Check the code!'); return; }
-
-  sbOpponentName = rows[0].host_name||'Friend';
+  const code=(document.getElementById('friend-join-input')?.value||'').toUpperCase().trim();
+  if(code.length!==6){sbSystemMsg('Enter a valid 6-character code');return;}
+  sbRoomId=code;sbPlayerColor='b';sbPlayerId='p_'+Date.now();
+  const myName=getPlayerName();
+  const rows=await sbSelect('chess_rooms','id=eq.'+code);
+  if(!rows||rows.length===0){sbSystemMsg('Room not found. Check the code!');return;}
+  sbOpponentName=rows[0].host_name||'Friend';
+  storeOpponentRating(rows[0].host_rating||1200);
   await sbUpdate('chess_rooms','id=eq.'+code,{
-    guest_id:sbPlayerId, guest_name:myName,
-    guest_rating:getPlayerRating(), status:'playing'
-  });
-
+    guest_id:sbPlayerId,guest_name:myName,guest_rating:getPlayerRating(),status:'playing'});
   connectRealtime(code);
-  showMMFound(sbOpponentName, rows[0].host_rating||1200, 'b');
+  showMMFound(sbOpponentName,rows[0].host_rating||1200,'b');
   setTimeout(()=>startOnlineGame('b',sbOpponentName),1500);
 }
 
 function copyFriendCode(){
   const el=document.getElementById('friend-room-code');
   const code=el?.textContent?.trim();
-  if(code && code!=='------'){
+  if(code&&code!=='------'){
     navigator.clipboard?.writeText(code).then(()=>{
-      sbSystemMsg('Code '+code+' copied! Share with your friend');
-      // Flash the code display
-      if(el){ el.style.color='#2ecc71'; setTimeout(()=>el.style.color='',1000); }
-    }).catch(()=>{
-      sbSystemMsg('Your code is: '+code+' — share it manually!');
-    });
-  } else {
-    sbSystemMsg('Please wait — generating code...');
+      sbSystemMsg('Code '+code+' copied!');
+      if(el){el.style.color='#2ecc71';setTimeout(()=>el.style.color='',1000);}
+    }).catch(()=>sbSystemMsg('Your code: '+code));
   }
 }
 
-// ── Realtime connection ──
-function connectRealtime(roomId){
-  realtimeWS = sbRealtime(roomId, (event, payload)=>{
-    if(event==='move'       && payload.player !== sbPlayerId) onRemoteMove(payload);
-    if(event==='chat'       && payload.player !== sbPlayerId) onRemoteChat(payload);
-    if(event==='resign'     && payload.player !== sbPlayerId) onRemoteResign();
-    if(event==='offer_draw') onDrawOffer();
-    // BUG2 FIX: Timer sync from host
-    if(event==='timer_sync' && payload.player !== sbPlayerId) onTimerSync(payload);
-  });
-}
-
-// ── Start the actual game ──
-function startOnlineGame(myColor, opponentName){
-  sbIsSearching = false;
-  const chatEl = document.getElementById('online-chat-panel');
-  if(chatEl) chatEl.style.display='block';
-  document.getElementById('ai-chat-log').innerHTML='';
-  sbSystemMsg('Connected to '+opponentName+' — Game starts!');
-  sbAddChat('gl hf!', 'system');
-
-  // BUG1 FIX: Correct color labels — YOU are always at bottom (p1)
-  // p1 = YOUR side (bottom), p2 = OPPONENT (top)
-  const myLabel   = getPlayerName()+' ('+(myColor==='w'?'⬜ White':'⬛ Black')+')';
-  const oppLabel  = opponentName+' ('+(myColor==='w'?'⬛ Black':'⬜ White')+')';
-  document.getElementById('p1-name').textContent = myLabel;
-  document.getElementById('p2-name').textContent = oppLabel;
-
-  // BUG1 FIX: Flip board for black player so YOUR pieces are at bottom
-  window.sbBoardFlipped = (myColor === 'b');
-
-  // BUG2 FIX: Host controls master timer — guest syncs from DB
-  // Both start from same time, host broadcasts timer every 5s
-  gameMode      = 'supabase';
-  sbPlayerColor = myColor;
-  initBoard();
-  clearInterval(timerInterval);
-  timers = {w:600, b:600};
-  showScreen('game-screen');
-  renderBoard();
-  updateStatus();
-
-  // Timer sync: host starts timer and broadcasts, guest follows
-  if(myColor === 'w'){
-    // Host (white) drives the timer
-    startTimer();
-    // Broadcast timer state every 5 seconds
-    window.sbTimerSync = setInterval(()=>{
-      if(realtimeWS && realtimeWS.readyState===1){
-        realtimeWS.sbSend('timer_sync',{
-          player: sbPlayerId,
-          wTime: timers.w,
-          bTime: timers.b,
-          turn: turn
-        });
-      }
-    }, 5000);
-  } else {
-    // Guest (black) starts timer locally too but syncs from host
-    startTimer();
-  }
-
-  AUD.startTheme();
-  showBannerAd();
-  // Show chat button for online games
-  showGameChatBtn();
-  // Add welcome message to game chat
-  setTimeout(()=>{
-    addGameChatMsg('💬 Chat with ' + opponentName + ' — tap CHAT button', 'system');
-  }, 500);
-}
-
-// ── Handle incoming opponent move ──
-function onRemoteMove(payload){
-  const mv = payload.move;
-  if(!mv) return;
-  // Execute on our board without sending back
-  executeMove(mv.fr, mv.fc, mv.r, mv.c, mv, true /* fromRemote */);
-  AUD.playMove();
-}
-
-// ── Handle incoming chat ──
-function onRemoteChat(payload){
-  const msg = sbOpponentName + ': ' + payload.msg;
-  sbAddChat(msg, 'opponent');
-  // Also add to in-game chat log
-  addGameChatMsg(msg, 'opponent');
-  AUD.playMove();
-}
-
-// ── Handle resign ──
-function onRemoteResign(){
-  sbSystemMsg(sbOpponentName+' resigned!');
-  showResult('w'===sbPlayerColor?'w':'b','resign');
-}
-
-// BUG2 FIX: Sync timer from host to guest
-function onTimerSync(payload){
-  if(sbPlayerColor === 'b'){
-    // Guest receives authoritative timer from host
-    timers.w = payload.wTime;
-    timers.b = payload.bTime;
-    updateTimerDisplay();
-  }
-}
-function onDrawOffer(){
-  sbSystemMsg(sbOpponentName+' offers a draw');
-}
-
-// ── Cancel matchmaking ──
-function cancelRealMatchmaking(){
-  sbIsSearching = false;
-  clearInterval(sbPollTimer);
-  clearInterval(window.sbTimerSync);
-  // Only delete room if we were the HOST waiting (not if game started)
-  if(sbRoomId && sbPlayerColor==='w'){
-    sbDelete('chess_rooms','id=eq.'+sbRoomId+'&status=eq.waiting').catch(()=>{});
-  }
-  if(realtimeWS){ try{realtimeWS.close();}catch(e){} realtimeWS=null; }
-  sbRoomId=null; sbPlayerColor=null;
-  resetMMWrap();
-  const chatEl=document.getElementById('online-chat-panel');
-  if(chatEl)chatEl.style.display='none';
-  showScreen('online-screen');
-}
-
-// ── Send move to opponent via Realtime ──
-function sendOnlineMove(mv){
-  if(gameMode!=='supabase'||!realtimeWS||realtimeWS.readyState!==1) return;
-  realtimeWS.sbSend('move',{player:sbPlayerId, move:mv});
-  // Also persist to DB for reconnection
-  sbUpdate('chess_rooms','id=eq.'+sbRoomId,{
-    last_move: JSON.stringify(mv),
-    current_turn: turn
-  }).catch(()=>{});
-}
-
-// ── Public chat ──
-function sendChat(){
-  const inp=document.getElementById('chat-input');
-  const msg=(inp?.value||'').trim(); if(!msg) return;
-  inp.value='';
-  sbAddChat('You: '+msg,'you');
-  if(gameMode==='supabase'&&realtimeWS?.readyState===1){
-    realtimeWS.sbSend('chat',{player:sbPlayerId, msg});
-  }
-}
-function quickReply(msg){ document.getElementById('chat-input').value=msg; sendChat(); }
-
-// ── Online tab switcher ──
-// Old setOnlineTab removed
-
-// Legacy wrappers (keep old function names working)
-function startMatchmaking(){ startRealMatchmaking(); }
-function cancelMatchmaking(){ cancelRealMatchmaking(); }
-
-// ── Ping Supabase on load to show server status ──
-async function checkSupabaseStatus(){
-  try{
-    const res = await fetch(SUPA_URL+'/rest/v1/chess_rooms?limit=1',{headers:SUPA_HDRS});
-    if(res.ok){
-      document.getElementById('sb-status-dot').style.color='#2ecc71';
-      const countEl=document.getElementById('online-count');
-      const gamesEl=document.getElementById('games-count');
-      if(countEl) countEl.textContent = '✓ Live';
-      if(gamesEl) gamesEl.textContent = 'Ready';
-      // Auto-run SQL migration silently
-      autoMigrate().catch(()=>{});
-    }
-  }catch(e){
-    const el=document.getElementById('sb-status-dot');
-    if(el)el.style.color='#e74c3c';
-  }
-}
-
-// Auto-migrate Supabase table columns if missing
 async function autoMigrate(){
-  // Check if columns exist by trying to select them
+  try{await sbSelect('chess_rooms','limit=1&select=id,host_name,guest_name,host_rating,guest_rating,guest_id,mode');}
+  catch(e){console.warn('Supabase columns may be missing');}
+}
+
+async function cleanStaleRooms(){
   try{
-    await sbSelect('chess_rooms','limit=1&select=id,host_name,guest_name,host_rating,guest_rating,guest_id,mode');
-  } catch(e){
-    // Columns missing — nothing we can do from client side
-    // User needs to run SQL in Supabase dashboard
-    console.warn('Supabase columns may be missing — run SQL migration');
-  }
-}
-
-// Status check integrated safely - no wrapper recursion
-
-
-
-/* ═══════════════════════════════════════════════════
-   NEXORA GAMING STUDIOS SPLASH
-═══════════════════════════════════════════════════ */
-function initNexoraSplash(){
-  const splash  = document.getElementById('studio-splash');
-  const bgCvs   = document.getElementById('splash-canvas');
-  const logoCvs = document.getElementById('nexora-logo-canvas');
-  const content = document.getElementById('splash-content');
-  if(!splash||!bgCvs||!logoCvs) return;
-
-  let t=0, animRAF=null;
-  const eOut  = v=>1-Math.pow(1-Math.min(1,Math.max(0,v)),3);
-  const lerp  = (a,b,t)=>a+(b-a)*Math.min(1,Math.max(0,t));
-  const clamp = (v,a,b)=>Math.min(b,Math.max(a,v));
-
-  function sizeCanvases(){
-    bgCvs.width=window.innerWidth; bgCvs.height=window.innerHeight;
-    const sz=Math.min(Math.min(window.innerWidth*0.65,window.innerHeight*0.45),280);
-    logoCvs.width=sz; logoCvs.height=sz;
-  }
-  sizeCanvases();
-  window.addEventListener('resize',sizeCanvases);
-
-  const pts=Array.from({length:70},()=>({
-    x:Math.random()*window.innerWidth, y:Math.random()*window.innerHeight,
-    vx:(Math.random()-.5)*.35, vy:(Math.random()-.5)*.35,
-    r:Math.random()*1.6+.3, a:Math.random(), gold:Math.random()>.38
-  }));
-
-  function drawBG(phase){
-    const c=bgCvs.getContext('2d'), W=bgCvs.width, H=bgCvs.height;
-    c.clearRect(0,0,W,H); c.fillStyle='#000'; c.fillRect(0,0,W,H);
-    const g=c.createRadialGradient(W/2,H/2,10,W/2,H/2,Math.min(W,H)*.55);
-    g.addColorStop(0,`rgba(201,168,76,${.14*phase})`);
-    g.addColorStop(1,'rgba(0,0,0,0)');
-    c.fillStyle=g; c.fillRect(0,0,W,H);
-    pts.forEach(p=>{
-      p.x+=p.vx; p.y+=p.vy;
-      if(p.x<0)p.x=W; if(p.x>W)p.x=0;
-      if(p.y<0)p.y=H; if(p.y>H)p.y=0;
-      c.beginPath(); c.arc(p.x,p.y,p.r,0,Math.PI*2);
-      c.fillStyle=p.gold?`rgba(201,168,76,${p.a*.22*phase})`:`rgba(255,255,255,${p.a*.09*phase})`;
-      c.fill();
-    });
-  }
-
-  function drawLogo(progress){
-    const cvs=logoCvs, c=cvs.getContext('2d');
-    const W=cvs.width, H=cvs.height;
-    c.clearRect(0,0,W,H);
-    if(W===0||H===0) return;
-    const p=clamp(progress,0,1);
-    const S=Math.min(W,H)*.44;
-    const cx=W/2, cy=H/2;
-    c.save(); c.translate(cx,cy);
-
-    // Outer glow
-    const og=c.createRadialGradient(0,0,S*.3,0,0,S*1.1);
-    og.addColorStop(0,`rgba(201,168,76,${.2*p})`);
-    og.addColorStop(1,'rgba(0,0,0,0)');
-    c.fillStyle=og; c.fillRect(-W/2,-H/2,W,H);
-
-    const goldP  = clamp(p/.35,0,1);
-    const steelP = clamp((p-.2)/.35,0,1);
-    const swordP = clamp((p-.45)/.4,0,1);
-    const glowP  = clamp((p-.6)/.4,0,1);
-
-    // ── GOLD N ──
-    c.save(); c.translate(lerp(-S*.6,0,eOut(goldP)),0);
-    c.globalAlpha=eOut(goldP);
-    // 3D shadow
-    c.fillStyle='rgba(60,30,0,.55)';
-    c.beginPath(); c.moveTo(-S*.46+S*.025,-S*.62+S*.025);
-    c.lineTo(-S*.46+S*.025,S*.62+S*.025); c.lineTo(-S*.28+S*.025,S*.62+S*.025);
-    c.lineTo(-S*.28+S*.025,-S*.08+S*.025); c.lineTo(S*.0+S*.025,S*.62+S*.025);
-    c.lineTo(S*.18+S*.025,S*.62+S*.025); c.lineTo(-S*.46+S*.025,-S*.62+S*.025);
-    c.closePath(); c.fill();
-    // Gold fill
-    const gg=c.createLinearGradient(-S*.46,-S*.65,S*.2,S*.65);
-    gg.addColorStop(0,'#fff8c8'); gg.addColorStop(.1,'#f8e060');
-    gg.addColorStop(.3,'#d4940a'); gg.addColorStop(.5,'#f0c040');
-    gg.addColorStop(.65,'#c9880a'); gg.addColorStop(.8,'#7a5008');
-    gg.addColorStop(1,'#c9a030');
-    c.fillStyle=gg;
-    c.beginPath(); c.moveTo(-S*.46,-S*.62); c.lineTo(-S*.46,S*.62);
-    c.lineTo(-S*.28,S*.62); c.lineTo(-S*.28,-S*.08);
-    c.lineTo(S*.0,S*.62); c.lineTo(S*.18,S*.62);
-    c.lineTo(-S*.46,-S*.62); c.closePath(); c.fill();
-    // Top spike
-    c.beginPath(); c.moveTo(-S*.46,-S*.62); c.lineTo(-S*.28,-S*.62);
-    c.lineTo(S*.18,S*.2); c.lineTo(S*.02,S*.2); c.closePath(); c.fill();
-    // Bevel
-    const gh=c.createLinearGradient(-S*.46,-S*.62,-S*.3,-.1);
-    gh.addColorStop(0,'rgba(255,248,180,.65)'); gh.addColorStop(1,'rgba(255,248,180,0)');
-    c.fillStyle=gh;
-    c.beginPath(); c.moveTo(-S*.46,-S*.62); c.lineTo(-S*.3,-S*.62);
-    c.lineTo(-S*.3,S*.08); c.lineTo(-S*.46,S*.28); c.closePath(); c.fill();
-    // Outline
-    c.strokeStyle='rgba(60,30,0,.9)'; c.lineWidth=W*.012; c.lineJoin='miter'; c.miterLimit=4;
-    c.beginPath(); c.moveTo(-S*.46,-S*.62); c.lineTo(-S*.46,S*.62);
-    c.lineTo(-S*.28,S*.62); c.lineTo(-S*.28,-S*.08);
-    c.lineTo(S*.0,S*.62); c.lineTo(S*.18,S*.62);
-    c.lineTo(-S*.46,-S*.62); c.closePath(); c.stroke();
-    c.restore();
-
-    // ── STEEL N ──
-    c.save(); c.translate(lerp(S*.6,0,eOut(steelP)),0);
-    c.globalAlpha=eOut(steelP);
-    // Shadow
-    c.fillStyle='rgba(20,20,30,.5)';
-    c.beginPath(); c.moveTo(-S*.04+S*.02,-S*.62+S*.025);
-    c.lineTo(S*.2+S*.02,-S*.62+S*.025); c.lineTo(S*.46+S*.02,S*.62+S*.025);
-    c.lineTo(S*.28+S*.02,S*.62+S*.025); c.lineTo(S*.28+S*.02,-S*.08+S*.025);
-    c.lineTo(S*.04+S*.02,S*.62+S*.025); c.lineTo(-S*.12+S*.02,S*.62+S*.025);
-    c.lineTo(-S*.04+S*.02,-S*.62+S*.025); c.closePath(); c.fill();
-    // Steel fill
-    const sg=c.createLinearGradient(-S*.04,-S*.62,S*.46,S*.65);
-    sg.addColorStop(0,'#eeeef8'); sg.addColorStop(.15,'#c0c0d4');
-    sg.addColorStop(.3,'#888898'); sg.addColorStop(.5,'#d8d8e8');
-    sg.addColorStop(.7,'#909098'); sg.addColorStop(.85,'#b8b8c8');
-    sg.addColorStop(1,'#686878');
-    c.fillStyle=sg;
-    c.beginPath(); c.moveTo(-S*.04,-S*.62); c.lineTo(S*.2,-S*.62);
-    c.lineTo(S*.46,S*.62); c.lineTo(S*.28,S*.62);
-    c.lineTo(S*.28,-S*.08); c.lineTo(S*.04,S*.62);
-    c.lineTo(-S*.12,S*.62); c.lineTo(-S*.04,-S*.62);
-    c.closePath(); c.fill();
-    // Top spike
-    c.beginPath(); c.moveTo(-S*.04,-S*.62); c.lineTo(S*.2,-S*.62);
-    c.lineTo(S*.46,S*.2); c.lineTo(S*.28,S*.2); c.closePath(); c.fill();
-    // Bevel
-    const sh=c.createLinearGradient(S*.2,-S*.62,S*.32,-.1);
-    sh.addColorStop(0,'rgba(230,230,250,.6)'); sh.addColorStop(1,'rgba(230,230,250,0)');
-    c.fillStyle=sh;
-    c.beginPath(); c.moveTo(S*.2,-S*.62); c.lineTo(S*.3,-S*.62);
-    c.lineTo(S*.3,S*.06); c.lineTo(S*.2,S*.28); c.closePath(); c.fill();
-    // Outline
-    c.strokeStyle='rgba(20,20,30,.85)'; c.lineWidth=W*.011; c.lineJoin='miter'; c.miterLimit=4;
-    c.beginPath(); c.moveTo(-S*.04,-S*.62); c.lineTo(S*.2,-S*.62);
-    c.lineTo(S*.46,S*.62); c.lineTo(S*.28,S*.62);
-    c.lineTo(S*.28,-S*.08); c.lineTo(S*.04,S*.62);
-    c.lineTo(-S*.12,S*.62); c.lineTo(-S*.04,-S*.62);
-    c.closePath(); c.stroke();
-    c.restore();
-
-    // ── Inner dark cutout ──
-    c.save(); c.globalAlpha=Math.min(eOut(goldP),eOut(steelP));
-    c.fillStyle='rgba(5,3,8,.82)';
-    c.beginPath(); c.moveTo(-S*.08,-S*.62); c.lineTo(S*.08,-S*.62);
-    c.lineTo(S*.0,S*.1); c.closePath(); c.fill();
-    c.strokeStyle='rgba(201,168,76,.45)'; c.lineWidth=S*.012;
-    c.beginPath(); c.moveTo(-S*.06,-S*.58); c.lineTo(0,S*.06); c.lineTo(S*.06,-S*.58); c.stroke();
-    c.restore();
-
-    // ── SWORD ──
-    c.save();
-    c.translate(0,lerp(-S*1.2,0,eOut(swordP)));
-    c.globalAlpha=eOut(swordP);
-    // Base glow
-    if(glowP>0){
-      const bg2=c.createRadialGradient(0,S*.25,0,0,S*.25,S*.6);
-      bg2.addColorStop(0,`rgba(255,200,50,${.6*eOut(glowP)})`);
-      bg2.addColorStop(.3,`rgba(255,140,0,${.25*eOut(glowP)})`);
-      bg2.addColorStop(1,'rgba(255,100,0,0)');
-      c.fillStyle=bg2; c.fillRect(-S*.6,-S*.2,S*1.2,S*.85);
+    const stale=await sbSelect('chess_rooms','status=eq.waiting&order=created_at.asc');
+    if(!stale)return;
+    const now=Date.now();
+    for(const r of stale){
+      if((now-new Date(r.created_at).getTime())>180000)
+        await sbDelete('chess_rooms','id=eq.'+r.id).catch(()=>{});
     }
-    // Blade
-    const blG=c.createLinearGradient(-S*.04,-S*.8,S*.04,S*.4);
-    blG.addColorStop(0,'#fff'); blG.addColorStop(.05,'#fff8c0');
-    blG.addColorStop(.2,'#f8e040'); blG.addColorStop(.5,'#c9a020');
-    blG.addColorStop(.8,'#8a6008'); blG.addColorStop(1,'#c9a030');
-    c.fillStyle=blG;
-    c.beginPath(); c.moveTo(0,-S*.82); c.lineTo(-S*.026,-S*.64);
-    c.lineTo(-S*.022,S*.38); c.lineTo(0,S*.42);
-    c.lineTo(S*.022,S*.38); c.lineTo(S*.026,-S*.64);
-    c.closePath(); c.fill();
-    // Fuller
-    c.strokeStyle='rgba(255,255,220,.6)'; c.lineWidth=S*.006;
-    c.beginPath(); c.moveTo(0,-S*.78); c.lineTo(0,S*.3); c.stroke();
-    // Tip glow
-    const tg=c.createRadialGradient(0,-S*.82,0,0,-S*.82,S*.2);
-    tg.addColorStop(0,`rgba(255,255,255,${.9*eOut(swordP)})`);
-    tg.addColorStop(.2,`rgba(255,240,120,${.7*eOut(swordP)})`);
-    tg.addColorStop(1,'rgba(255,200,50,0)');
-    c.fillStyle=tg; c.fillRect(-S*.2,-S*1.02,S*.4,S*.4);
-    // Crossguard
-    const cgG=c.createLinearGradient(-S*.3,0,S*.3,0);
-    cgG.addColorStop(0,'#7a5010'); cgG.addColorStop(.5,'#f0d060'); cgG.addColorStop(1,'#7a5010');
-    c.fillStyle=cgG;
-    c.beginPath(); c.moveTo(-S*.3,S*.38); c.lineTo(-S*.26,S*.33);
-    c.lineTo(-S*.03,S*.36); c.lineTo(0,S*.4); c.lineTo(S*.03,S*.36);
-    c.lineTo(S*.26,S*.33); c.lineTo(S*.3,S*.38); c.lineTo(S*.26,S*.45);
-    c.lineTo(S*.03,S*.43); c.lineTo(0,S*.46); c.lineTo(-S*.03,S*.43);
-    c.lineTo(-S*.26,S*.45); c.closePath(); c.fill();
-    c.strokeStyle='rgba(201,168,76,.8)'; c.lineWidth=S*.01; c.stroke();
-    // Guard orbs
-    [[-S*.3,S*.415],[S*.3,S*.415]].forEach(([ex,ey])=>{
-      c.fillStyle='#f0d060'; c.beginPath(); c.arc(ex,ey,S*.04,0,Math.PI*2); c.fill();
-    });
-    // Grip
-    c.fillStyle='#3a1a08';
-    c.beginPath(); c.roundRect(-S*.028,S*.46,S*.056,S*.28,W*.005); c.fill();
-    c.strokeStyle='#7a4010'; c.lineWidth=S*.008;
-    for(let g=0;g<5;g++){c.beginPath();c.moveTo(-S*.028,S*(.49+g*.048));c.lineTo(S*.028,S*(.49+g*.048));c.stroke();}
-    // Pommel
-    const pG=c.createRadialGradient(0,S*.64,0,0,S*.74,S*.088);
-    pG.addColorStop(0,'#fff8c0'); pG.addColorStop(.4,'#f0d040');
-    pG.addColorStop(.8,'#c9a020'); pG.addColorStop(1,'#6a4808');
-    c.fillStyle=pG; c.beginPath(); c.arc(0,S*.74,S*.09,0,Math.PI*2); c.fill();
-    c.strokeStyle='#c9a84c'; c.lineWidth=S*.012; c.stroke();
-    // Impact burst
-    if(glowP>0&&glowP<.9){
-      const ba=Math.sin(glowP*Math.PI)*.6;
-      c.save(); c.globalAlpha=ba;
-      const rG=c.createLinearGradient(-S*.8,S*.35,S*.8,S*.35);
-      rG.addColorStop(0,'rgba(255,200,50,0)'); rG.addColorStop(.5,'rgba(255,220,80,.7)'); rG.addColorStop(1,'rgba(255,200,50,0)');
-      c.fillStyle=rG; c.fillRect(-S*.8,S*.22,S*1.6,S*.26); c.restore();
-    }
-    c.restore();
-
-    // Pulse halo when fully visible
-    if(p>.85){
-      const pa=.07+Math.sin(t*.05)*.035;
-      const hG=c.createRadialGradient(0,0,S*.5,0,0,S*1.8);
-      hG.addColorStop(0,'rgba(201,168,76,0)'); hG.addColorStop(.7,`rgba(201,168,76,${pa})`); hG.addColorStop(1,'rgba(201,168,76,0)');
-      c.fillStyle=hG; c.fillRect(-W/2,-H/2,W,H);
-    }
-    c.restore();
-  }
-
-  const F_LOGO_START=20, F_TEXT_SHOW=110, F_FADE_START=200, F_TOTAL=260;
-
-  function loop(){
-    t++;
-    const bgPhase  =clamp(t/F_LOGO_START,0,1);
-    const logoPhase=clamp((t-F_LOGO_START)/80,0,1);
-    const fadePhase=clamp((t-F_FADE_START)/(F_TOTAL-F_FADE_START),0,1);
-    drawBG(eOut(bgPhase));
-    drawLogo(eOut(logoPhase));
-    if(t>=F_TEXT_SHOW&&content&&!content.classList.contains('show'))
-      content.classList.add('show');
-    if(t>=F_FADE_START) splash.style.opacity=String(1-eOut(fadePhase));
-    if(t>=F_TOTAL){ dismissSplash(); return; }
-    animRAF=requestAnimationFrame(loop);
-  }
-  setTimeout(()=>{ sizeCanvases(); requestAnimationFrame(loop); },60);
-}
-
-function dismissSplash(e){
-  if(e) e.stopPropagation();
-  const splash=document.getElementById('studio-splash');
-  if(!splash||splash.dataset.gone) return;
-  splash.dataset.gone='1';
-  AUD.unlock();
-  splash.style.transition='opacity 0.35s ease';
-  splash.style.opacity='0';
-  setTimeout(()=>{ if(splash.parentNode) splash.parentNode.removeChild(splash); },380);
-}
-
-
-/* ══════════════════════════════════════════════════════════
-   ELO RANKING SYSTEM — Full implementation
-   - Rank tiers with badges
-   - ELO calculation
-   - Supabase leaderboard
-   - Rating update after ranked games
-   - Rank-up notifications
-══════════════════════════════════════════════════════════ */
-
-// ── RANK TIER DEFINITIONS ──
-const RANK_TIERS = [
-  { name:'GrandMaster', min:2200, emoji:'🔱', color:'#ff6b35', glow:'rgba(255,107,53,0.4)' },
-  { name:'Master',      min:2000, emoji:'👑', color:'#9b59b6', glow:'rgba(155,89,182,0.4)' },
-  { name:'Diamond',     min:1800, emoji:'💎', color:'#00d2ff', glow:'rgba(0,210,255,0.4)' },
-  { name:'Gold',        min:1600, emoji:'🥇', color:'#FFD700', glow:'rgba(255,215,0,0.4)'  },
-  { name:'Silver',      min:1400, emoji:'🥈', color:'#C0C0C0', glow:'rgba(192,192,192,0.4)'},
-  { name:'Bronze',      min:1200, emoji:'🥉', color:'#CD7F32', glow:'rgba(205,127,50,0.4)' },
-  { name:'Iron',        min:1000, emoji:'⚔️', color:'#7f8c8d', glow:'rgba(127,140,141,0.4)'},
-  { name:'Stone',       min:0,    emoji:'🪨', color:'#5d6d7e', glow:'rgba(93,109,126,0.4)' },
-];
-
-function getRankTier(rating){
-  for(const tier of RANK_TIERS){
-    if(rating >= tier.min) return tier;
-  }
-  return RANK_TIERS[RANK_TIERS.length-1];
-}
-
-function getRankProgress(rating){
-  const tier = getRankTier(rating);
-  const tierIdx = RANK_TIERS.indexOf(tier);
-  if(tierIdx === 0) return 100; // GrandMaster = maxed
-  const nextTier = RANK_TIERS[tierIdx-1];
-  const progress = ((rating - tier.min) / (nextTier.min - tier.min)) * 100;
-  return Math.min(100, Math.max(0, Math.round(progress)));
-}
-
-// ── ELO CALCULATION ──
-function calcELO(myRating, oppRating, result){
-  // result: 1=win, 0=loss, 0.5=draw
-  // K factor based on rating
-  const K = myRating < 1400 ? 32 : myRating < 1800 ? 24 : 16;
-  const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / 400));
-  const change = Math.round(K * (result - expected));
-  return change;
-}
-
-// ── LOCAL PLAYER DATA (stored in localStorage) ──
-function getMyPlayerData(){
-  try{
-    const saved = localStorage.getItem('chessx_player_data');
-    if(saved) return JSON.parse(saved);
   }catch(e){}
-  return {
-    id:      'p_' + Date.now() + '_' + Math.random().toString(36).substr(2,8),
-    name:    'Commander',
-    rating:  1200,
-    wins:    0,
-    losses:  0,
-    draws:   0,
-    games:   0,
-    history: [] // last 20 rating changes
-  };
-}
-
-function saveMyPlayerData(data){
-  try{ localStorage.setItem('chessx_player_data', JSON.stringify(data)); }catch(e){}
-}
-
-// Sync player data with Supabase
-async function syncPlayerToSupabase(data){
-  try{
-    // Try to update existing record
-    const existing = await sbSelect('players', 'id=eq.'+data.id);
-    if(existing && existing.length > 0){
-      await sbUpdate('players', 'id=eq.'+data.id, {
-        name:   data.name,
-        rating: data.rating,
-        wins:   data.wins,
-        losses: data.losses,
-        draws:  data.draws,
-        games:  data.games
-      });
-    } else {
-      // Insert new player
-      await sbInsert('players', {
-        id:     data.id,
-        name:   data.name,
-        rating: data.rating,
-        wins:   data.wins,
-        losses: data.losses,
-        draws:  data.draws,
-        games:  data.games
-      });
-    }
-  }catch(e){ console.log('Player sync error:', e); }
-}
-
-// ── UPDATE RATING AFTER RANKED GAME ──
-async function updateRankedRating(result, oppRating, oppName){
-  // result: 'win', 'loss', 'draw'
-  const data = getMyPlayerData();
-  const oldRating = data.rating;
-  const oldTier   = getRankTier(oldRating);
-
-  // Calculate ELO change
-  const score   = result==='win' ? 1 : result==='draw' ? 0.5 : 0;
-  const change  = calcELO(data.rating, oppRating, score);
-  data.rating   = Math.max(100, data.rating + change); // min 100
-
-  // Update W/L/D
-  if(result==='win')   data.wins++;
-  else if(result==='loss') data.losses++;
-  else                  data.draws++;
-  data.games++;
-  data.name = getPlayerName();
-
-  // Save rating history
-  data.history.unshift({
-    change, oppName, result,
-    rating: data.rating,
-    date: Date.now()
-  });
-  if(data.history.length > 20) data.history.pop();
-
-  saveMyPlayerData(data);
-
-  // Sync to Supabase in background
-  syncPlayerToSupabase(data).catch(()=>{});
-
-  // Update UI rating display
-  const ratingEl = document.getElementById('player-rating');
-  if(ratingEl) ratingEl.textContent = data.rating;
-
-  // Check for rank tier change
-  const newTier = getRankTier(data.rating);
-  const promoted = newTier.min > oldTier.min;
-  const demoted  = newTier.min < oldTier.min;
-
-  // Show rank change notification in result modal
-  showRatingChange(oldRating, data.rating, change, newTier, promoted, demoted);
-
-  return { oldRating, newRating: data.rating, change, newTier, promoted };
-}
-
-function showRatingChange(oldR, newR, change, tier, promoted, demoted){
-  // Add rating change to result modal
-  const modal = document.getElementById('result-modal');
-  if(!modal) return;
-
-  // Remove any existing rating change block
-  const existing = document.getElementById('rating-change-block');
-  if(existing) existing.remove();
-
-  const block = document.createElement('div');
-  block.id = 'rating-change-block';
-  block.className = 'rating-change-wrap';
-  block.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between">
-      <div>
-        <div class="rc-old">Rating: ${oldR}</div>
-        <div class="rc-new">${tier.emoji} ${newR}</div>
-        <div class="rc-delta ${change>=0?'up':'down'}">${change>=0?'+':''}${change} points</div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-size:36px">${tier.emoji}</div>
-        <div style="font-size:9px;color:${tier.color};letter-spacing:2px">${tier.name.toUpperCase()}</div>
-      </div>
-    </div>
-    ${promoted ? `<div style="color:#2ecc71;font-size:10px;letter-spacing:2px;margin-top:6px;text-align:center">🎉 PROMOTED TO ${tier.name.toUpperCase()}!</div>` : ''}
-    ${demoted  ? `<div style="color:#e74c3c;font-size:10px;letter-spacing:2px;margin-top:6px;text-align:center">↓ Demoted to ${tier.name}</div>` : ''}
-  `;
-
-  // Insert into modal after res-desc
-  const desc = document.getElementById('res-desc');
-  if(desc && desc.parentNode) desc.parentNode.insertBefore(block, desc.nextSibling);
-
-  // Show rank-up toast if promoted
-  if(promoted){
-    setTimeout(()=>showRankUpToast(tier, newR, change), 1500);
-  }
-}
-
-function showRankUpToast(tier, rating, change){
-  const toast = document.getElementById('rank-up-toast');
-  if(!toast) return;
-  document.getElementById('toast-badge').textContent  = tier.emoji;
-  document.getElementById('toast-title').textContent  = 'RANK UP!';
-  document.getElementById('toast-rating').textContent = rating;
-  document.getElementById('toast-delta').textContent  = '+'+change+' points';
-  document.getElementById('toast-tier').textContent   = 'PROMOTED TO '+tier.name.toUpperCase()+'!';
-  toast.style.display = 'flex';
-  toast.style.flexDirection = 'column';
-  toast.style.alignItems = 'center';
-  // Auto hide after 8s
-  setTimeout(()=>{ toast.style.display='none'; }, 8000);
-}
-
-// ── LOAD LEADERBOARD FROM SUPABASE ──
-async function loadLeaderboard(type='global'){
-  // Update tabs
-  document.querySelectorAll('.lb-tab').forEach(t=>t.classList.remove('active'));
-  const tabEl = document.getElementById('lbt-'+type);
-  if(tabEl) tabEl.classList.add('active');
-
-  const listEl = document.getElementById('lb-list');
-  if(listEl) listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-dim);font-family:sans-serif;font-size:12px">⏳ Loading rankings…</div>';
-
-  // Load my data
-  const myData = getMyPlayerData();
-  updateMyRankCard(myData);
-
-  try{
-    // Fetch top 50 players from Supabase
-    const players = await sbSelect('players',
-      'order=rating.desc&limit=50'
-    );
-
-    if(!players || players.length === 0){
-      if(listEl) listEl.innerHTML = `
-        <div style="text-align:center;padding:30px;color:var(--text-dim);font-family:sans-serif;font-size:12px;line-height:1.8">
-          No ranked players yet!<br>
-          <span style="color:var(--gold)">Play Ranked matches to appear here.</span>
-        </div>`;
-      return;
-    }
-
-    // Find my position
-    const myPos = players.findIndex(p=>p.id===myData.id);
-    const myRankPos = document.getElementById('my-rank-pos');
-    if(myRankPos) myRankPos.textContent = myPos>=0 ? '#'+(myPos+1) : '#—';
-
-    // Render list
-    if(listEl){
-      listEl.innerHTML = players.map((p, idx)=>{
-        const tier    = getRankTier(p.rating||1200);
-        const isMe    = p.id === myData.id;
-        const posClass= idx===0?'top1':idx===1?'top2':idx===2?'top3':'';
-        const posIcon = idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':'';
-        const wl      = p.wins&&p.losses ? `${p.wins}W / ${p.losses}L` : '';
-        return `
-          <div class="lb-row ${isMe?'me':''}">
-            <div class="lb-pos ${posClass}">${posIcon||'#'+(idx+1)}</div>
-            <div class="lb-badge">${tier.emoji}</div>
-            <div class="lb-info">
-              <div class="lb-name">${p.name||'Player'}${isMe?' (You)':''}</div>
-              <div class="lb-rank-name" style="color:${tier.color}">${tier.name.toUpperCase()}</div>
-            </div>
-            <div>
-              <div class="lb-rating">${p.rating||1200}</div>
-              <div class="lb-wl">${wl}</div>
-            </div>
-          </div>`;
-      }).join('');
-    }
-
-  }catch(e){
-    if(listEl) listEl.innerHTML = `
-      <div style="text-align:center;padding:20px;color:#e74c3c;font-family:sans-serif;font-size:11px">
-        Could not load rankings. Check your connection.
-      </div>`;
-  }
-}
-
-function updateMyRankCard(data){
-  const tier     = getRankTier(data.rating);
-  const progress = getRankProgress(data.rating);
-  const tierIdx  = RANK_TIERS.indexOf(tier);
-  const nextTier = tierIdx > 0 ? RANK_TIERS[tierIdx-1] : null;
-  const ptsToNext= nextTier ? nextTier.min - data.rating : 0;
-
-  // Update card elements
-  const set = (id,val)=>{ const el=document.getElementById(id); if(el)el.textContent=val; };
-  set('my-rank-emoji',     tier.emoji);
-  set('my-rank-tier-name', tier.name.toUpperCase());
-  set('my-rank-player-name', data.name||'Commander');
-  set('my-rank-rating',    data.rating);
-  set('my-rank-wins',      data.wins||0);
-  set('my-rank-losses',    data.losses||0);
-  set('my-rank-draws',     data.draws||0);
-
-  // Color the badge
-  const badge = document.getElementById('my-rank-badge-big');
-  if(badge) badge.style.borderColor = tier.color;
-}
-
-// ── HOOK INTO GAME RESULT ──
-// Call this when a ranked game ends
-async function handleRankedGameEnd(winner, reason){
-  // Only update rating in ranked mode
-  if(window._currentOnlineTab !== 'ranked') return;
-
-  const myColor   = sbPlayerColor;
-  const oppRating = window._sbOpponentRating || 1200;
-  const oppName   = sbOpponentName || 'Opponent';
-
-  let result;
-  if(reason === 'stalemate' || reason === 'draw'){
-    result = 'draw';
-  } else if(
-    (winner==='w' && myColor==='w') ||
-    (winner==='b' && myColor==='b')
-  ){
-    result = 'win';
-  } else {
-    result = 'loss';
-  }
-
-  await updateRankedRating(result, oppRating, oppName);
-}
-
-// Store opponent rating when match is found
-function storeOpponentRating(rating){
-  window._sbOpponentRating = parseInt(rating) || 1200;
-}
-
-// ── INIT PLAYER DATA ON LOAD ──
-function initPlayerRankData(){
-  const data = getMyPlayerData();
-  loadPlayerProfile();
-  // Sync to Supabase if we have games
-  if(data.games > 0) syncPlayerToSupabase(data).catch(()=>{});
 }
 
 
 
-/* ══ DRAW CONDITION DETECTION ══ */
+/* ══ DRAW CONDITIONS ══ */
 function isInsufficientMaterial(){
   const pieces=[];
   for(let r=0;r<8;r++)for(let c=0;c<8;c++)if(board[r][c])pieces.push(board[r][c]);
@@ -4272,22 +3823,13 @@ function isInsufficientMaterial(){
   if(onlyK(w)&&kAndB(b))return true;
   if(kAndN(w)&&onlyK(b))return true;
   if(onlyK(w)&&kAndN(b))return true;
-  if(kAndB(w)&&kAndB(b)){
-    let wp=null,bp=null;
-    for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-      if(board[r][c]&&board[r][c].color==='w'&&board[r][c].type==='B')wp={r,c};
-      if(board[r][c]&&board[r][c].color==='b'&&board[r][c].type==='B')bp={r,c};
-    }
-    if(wp&&bp&&(wp.r+wp.c)%2===(bp.r+bp.c)%2)return true;
-  }
   return false;
 }
 let halfMoveClock=0;
 function updateHalfMoveClock(piece,captured){
-  if(captured||piece.type==='P')halfMoveClock=0;
-  else halfMoveClock++;
+  if(captured||piece.type==='P')halfMoveClock=0;else halfMoveClock++;
 }
-function isFiftyMoveRule(){ return halfMoveClock>=100; }
+function isFiftyMoveRule(){return halfMoveClock>=100;}
 const positionHistory=[];
 function getBoardHash(){
   let h=turn;
@@ -4300,262 +3842,235 @@ function recordPosition(){
   return positionHistory.filter(x=>x===h).length>=3;
 }
 function isThreefoldRepetition(){
-  const h=getBoardHash();
-  return positionHistory.filter(x=>x===h).length>=3;
+  const h=getBoardHash();return positionHistory.filter(x=>x===h).length>=3;
 }
-function resetDrawTrackers(){
-  halfMoveClock=0;positionHistory.length=0;
+function resetDrawTrackers(){halfMoveClock=0;positionHistory.length=0;}
+
+/* ══ FLAT BOARD MOVE ENGINE ══ */
+function toFlat(){
+  const f=new Array(64);
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){const p=board[r][c];f[r*8+c]=p?{t:p.type,c:p.color}:null;}
+  return f;
 }
-
-
-/* ══ PLAYER PROFILE — Name + Country Flag ══ */
-const COUNTRIES = [
-  {code:'ae',flag:'🇦🇪',name:'UAE'},
-  {code:'us',flag:'🇺🇸',name:'USA'},
-  {code:'gb',flag:'🇬🇧',name:'UK'},
-  {code:'in',flag:'🇮🇳',name:'India'},
-  {code:'pk',flag:'🇵🇰',name:'Pakistan'},
-  {code:'sa',flag:'🇸🇦',name:'Saudi Arabia'},
-  {code:'eg',flag:'🇪🇬',name:'Egypt'},
-  {code:'ng',flag:'🇳🇬',name:'Nigeria'},
-  {code:'de',flag:'🇩🇪',name:'Germany'},
-  {code:'fr',flag:'🇫🇷',name:'France'},
-  {code:'es',flag:'🇪🇸',name:'Spain'},
-  {code:'it',flag:'🇮🇹',name:'Italy'},
-  {code:'br',flag:'🇧🇷',name:'Brazil'},
-  {code:'mx',flag:'🇲🇽',name:'Mexico'},
-  {code:'ca',flag:'🇨🇦',name:'Canada'},
-  {code:'au',flag:'🇦🇺',name:'Australia'},
-  {code:'ru',flag:'🇷🇺',name:'Russia'},
-  {code:'cn',flag:'🇨🇳',name:'China'},
-  {code:'jp',flag:'🇯🇵',name:'Japan'},
-  {code:'kr',flag:'🇰🇷',name:'South Korea'},
-  {code:'tr',flag:'🇹🇷',name:'Turkey'},
-  {code:'ir',flag:'🇮🇷',name:'Iran'},
-  {code:'iq',flag:'🇮🇶',name:'Iraq'},
-  {code:'jo',flag:'🇯🇴',name:'Jordan'},
-  {code:'kw',flag:'🇰🇼',name:'Kuwait'},
-  {code:'qa',flag:'🇶🇦',name:'Qatar'},
-  {code:'om',flag:'🇴🇲',name:'Oman'},
-  {code:'bh',flag:'🇧🇭',name:'Bahrain'},
-  {code:'lb',flag:'🇱🇧',name:'Lebanon'},
-  {code:'sy',flag:'🇸🇾',name:'Syria'},
-  {code:'ma',flag:'🇲🇦',name:'Morocco'},
-  {code:'dz',flag:'🇩🇿',name:'Algeria'},
-  {code:'tn',flag:'🇹🇳',name:'Tunisia'},
-  {code:'za',flag:'🇿🇦',name:'South Africa'},
-  {code:'ke',flag:'🇰🇪',name:'Kenya'},
-  {code:'gh',flag:'🇬🇭',name:'Ghana'},
-  {code:'et',flag:'🇪🇹',name:'Ethiopia'},
-  {code:'id',flag:'🇮🇩',name:'Indonesia'},
-  {code:'my',flag:'🇲🇾',name:'Malaysia'},
-  {code:'ph',flag:'🇵🇭',name:'Philippines'},
-  {code:'th',flag:'🇹🇭',name:'Thailand'},
-  {code:'vn',flag:'🇻🇳',name:'Vietnam'},
-  {code:'bd',flag:'🇧🇩',name:'Bangladesh'},
-  {code:'lk',flag:'🇱🇰',name:'Sri Lanka'},
-  {code:'np',flag:'🇳🇵',name:'Nepal'},
-  {code:'ar',flag:'🇦🇷',name:'Argentina'},
-  {code:'co',flag:'🇨🇴',name:'Colombia'},
-  {code:'cl',flag:'🇨🇱',name:'Chile'},
-  {code:'pe',flag:'🇵🇪',name:'Peru'},
-  {code:'nl',flag:'🇳🇱',name:'Netherlands'},
-  {code:'be',flag:'🇧🇪',name:'Belgium'},
-  {code:'se',flag:'🇸🇪',name:'Sweden'},
-  {code:'no',flag:'🇳🇴',name:'Norway'},
-  {code:'dk',flag:'🇩🇰',name:'Denmark'},
-  {code:'fi',flag:'🇫🇮',name:'Finland'},
-  {code:'pl',flag:'🇵🇱',name:'Poland'},
-  {code:'pt',flag:'🇵🇹',name:'Portugal'},
-  {code:'gr',flag:'🇬🇷',name:'Greece'},
-  {code:'ro',flag:'🇷🇴',name:'Romania'},
-  {code:'ua',flag:'🇺🇦',name:'Ukraine'},
-  {code:'ng',flag:'🇳🇬',name:'Nigeria'},
-];
-
-// Build country dropdown
-function buildCountrySelect(){
-  const sel = document.getElementById('player-country');
-  if(!sel) return;
-  sel.innerHTML = COUNTRIES.map(c=>
-    `<option value="${c.code}">${c.flag} ${c.name}</option>`
-  ).join('');
+function fg(f,r,c){return f[r*8+c];}
+function fs(f,r,c,v){f[r*8+c]=v;}
+function fb(r,c){return r>=0&&r<8&&c>=0&&c<8;}
+function flatPseudo(f,r,c){
+  const p=fg(f,r,c);if(!p)return[];
+  const t=p.t,col=p.c;
+  const enemy=(nr,nc)=>{const x=fg(f,nr,nc);return x&&x.c!==col;};
+  const empty=(nr,nc)=>!fg(f,nr,nc);
+  const m=[];
+  if(t==='P'){
+    const d=col==='w'?-1:1,s=col==='w'?6:1;
+    if(fb(r+d,c)&&empty(r+d,c)){m.push([r+d,c]);if(r===s&&empty(r+2*d,c))m.push([r+2*d,c]);}
+    for(const dc of[-1,1])if(fb(r+d,c+dc)&&enemy(r+d,c+dc))m.push([r+d,c+dc]);
+  }
+  if(t==='N'){for(const[dr,dc]of[[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]]){const nr=r+dr,nc=c+dc;if(fb(nr,nc)&&(!fg(f,nr,nc)||enemy(nr,nc)))m.push([nr,nc]);}}
+  if(t==='K'){for(const[dr,dc]of[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]){const nr=r+dr,nc=c+dc;if(fb(nr,nc)&&(!fg(f,nr,nc)||enemy(nr,nc)))m.push([nr,nc]);}}
+  for(const[tp,dirs]of[['R',[[0,1],[0,-1],[1,0],[-1,0]]],['B',[[1,1],[1,-1],[-1,1],[-1,-1]]],['Q',[[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]]]){
+    if(t!==tp)continue;
+    for(const[dr,dc]of dirs){let nr=r+dr,nc=c+dc;while(fb(nr,nc)){if(empty(nr,nc))m.push([nr,nc]);else{if(enemy(nr,nc))m.push([nr,nc]);break;}nr+=dr;nc+=dc;}}
+  }
+  return m;
 }
-
-// Save player profile to localStorage
-function savePlayerProfile(){
-  const name    = document.getElementById('player-display-name')?.value?.trim() || 'Commander';
-  const country = document.getElementById('player-country')?.value || 'ae';
-  const data    = getMyPlayerData();
-  data.name    = name;
-  data.country = country;
-  saveMyPlayerData(data);
-  // Update avatar flag
-  updateAvatarFlag(country);
-  // Update rank emoji
-  const t = getRankTier(data.rating);
-  const re = document.getElementById('player-rank-emoji');
-  if(re) re.textContent = t.emoji;
+function flatSquareAttacked(f,r,c,myColor){
+  const opp=myColor==='w'?'b':'w';
+  for(let rr=0;rr<8;rr++)for(let cc=0;cc<8;cc++){const p=fg(f,rr,cc);if(!p||p.c!==opp)continue;for(const[nr,nc]of flatPseudo(f,rr,cc))if(nr===r&&nc===c)return true;}
+  return false;
+}
+function flatInCheck(f,color){
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){const p=fg(f,r,c);if(p&&p.t==='K'&&p.c===color)return flatSquareAttacked(f,r,c,color);}
+  return false;
+}
+function flatApply(f,fr,fc,tr,tc,ep){
+  const f2=f.slice();fs(f2,tr,tc,fg(f,fr,fc));fs(f2,fr,fc,null);
+  if(ep)fs(f2,ep[0],ep[1],null);return f2;
+}
+function getPseudoMoves(r,c){
+  const f=toFlat();return flatPseudo(f,r,c).map(([nr,nc])=>({r:nr,c:nc}));
+}
+function getLegalMoves(r,c){
+  const piece=board[r][c];if(!piece)return[];
+  const f=toFlat();const legal=[];
+  for(const[tr,tc]of flatPseudo(f,r,c)){
+    let ep=null;
+    if(piece.type==='P'&&Math.abs(tc-c)===1&&!fg(f,tr,tc)&&enPassantTarget&&enPassantTarget.r===tr&&enPassantTarget.c===tc)
+      ep=[enPassantTarget.pawnR,enPassantTarget.pawnC];
+    const f2=flatApply(f,r,c,tr,tc,ep);
+    if(flatInCheck(f2,piece.color))continue;
+    const mv={r:tr,c:tc};if(ep)mv.enPassant=true;
+    if(piece.type==='K'&&Math.abs(tc-c)===2){
+      mv.castle=true;
+      if(flatInCheck(f,piece.color))continue;
+      const midC=c+(tc>c?1:-1);
+      const fMid=flatApply(f,r,c,r,midC,null);
+      if(flatInCheck(fMid,piece.color))continue;
+    }
+    legal.push(mv);
+  }
+  return legal;
+}
+function isInCheck(color){return flatInCheck(toFlat(),color);}
+function isSA(r,c,myColor){return flatSquareAttacked(toFlat(),r,c,myColor);}
+function hasLM(color){
+  const f=toFlat();
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+    const p=fg(f,r,c);if(!p||p.c!==color)continue;
+    for(const[tr,tc]of flatPseudo(f,r,c)){
+      const f2=flatApply(f,r,c,tr,tc,null);if(!flatInCheck(f2,color))return true;
+    }
+  }
+  return false;
 }
 
-function updateAvatarFlag(countryCode){
-  const country = COUNTRIES.find(c=>c.code===countryCode);
-  const avatar  = document.getElementById('player-avatar-flag');
-  if(avatar && country) avatar.textContent = country.flag;
-}
+/* ══ ONLINE MATCHMAKING ══ */
+let sbIsSearching=false,sbPollTimer=null,sbRoomId=null,sbPlayerId=null;
+let sbPlayerColor=null,sbOpponentName='',realtimeWS=null;
 
-function getPlayerFlag(){
-  const data = getMyPlayerData();
-  const c = COUNTRIES.find(c=>c.code===(data.country||'ae'));
-  return c ? c.flag : '🌍';
-}
-
-// Load profile into UI
-function loadPlayerProfile(){
-  const data = getMyPlayerData();
-  const nameEl = document.getElementById('player-display-name');
-  if(nameEl && data.name) nameEl.value = data.name;
-  buildCountrySelect();
-  // Set saved country
-  const sel = document.getElementById('player-country');
-  if(sel && data.country) sel.value = data.country;
-  updateAvatarFlag(data.country || 'ae');
-  // Set rating
-  const ratingEl = document.getElementById('player-rating');
-  if(ratingEl) ratingEl.textContent = data.rating || 1200;
-  // Set rank emoji
-  const t = getRankTier(data.rating || 1200);
-  const re = document.getElementById('player-rank-emoji');
-  if(re) re.textContent = t.emoji;
-}
-
-
-
-/* ══ SHOP FUNCTIONS ══ */
-
-// Coming soon toast
-function showComingSoon(){
-  const toast = document.createElement('div');
-  toast.style.cssText = `
-    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-    background:linear-gradient(135deg,#1c1006,#2a1808);
-    border:2px solid var(--gold);border-radius:8px;
-    padding:24px 32px;text-align:center;z-index:9999;
-    min-width:260px;animation:mIn 0.3s ease;
-  `;
-  toast.innerHTML = `
-    <div style="font-size:36px;margin-bottom:10px">🚀</div>
-    <div style="font-size:14px;color:var(--gold-light);font-family:Cinzel,serif;letter-spacing:2px;font-weight:700">COMING SOON</div>
-    <div style="font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.6">
-      Full payments will be available<br>when ChessX launches on Google Play
-    </div>
-    <div style="font-size:10px;color:var(--gold);margin-top:10px;letter-spacing:2px">FREE DURING BETA ✓</div>
-    <button onclick="this.parentNode.remove()" style="margin-top:14px;padding:8px 20px;background:rgba(201,168,76,0.15);border:1px solid var(--gold);border-radius:4px;color:var(--gold);font-family:Cinzel,serif;font-size:10px;letter-spacing:2px;cursor:pointer">OK</button>
-  `;
-  document.body.appendChild(toast);
-  setTimeout(()=>{ if(toast.parentNode) toast.remove(); }, 4000);
-}
-
-// Preview theme from shop
-function previewTheme(theme){
-  applyBoardTheme(theme);
-  const toast = document.createElement('div');
-  toast.style.cssText = `
-    position:fixed;bottom:100px;left:50%;transform:translateX(-50%);
-    background:rgba(0,0,0,0.85);border:1px solid var(--gold);
-    border-radius:6px;padding:10px 18px;z-index:9999;
-    font-size:11px;color:var(--gold-light);letter-spacing:2px;
-    font-family:Cinzel,serif;text-align:center;
-  `;
-  toast.textContent = '✓ ' + theme.toUpperCase() + ' THEME APPLIED';
-  document.body.appendChild(toast);
-  setTimeout(()=>{ if(toast.parentNode) toast.remove(); }, 2000);
-}
-
-
-
-/* ══ IN-GAME CHAT ══ */
-let gameChatOpen = false;
-let gameChatUnread = 0;
-
-function toggleGameChat(){
-  gameChatOpen = !gameChatOpen;
-  const panel = document.getElementById('game-chat-panel');
-  if(panel) panel.style.display = gameChatOpen ? 'block' : 'none';
-  if(gameChatOpen){
-    gameChatUnread = 0;
-    updateChatBadge();
-    // Scroll to bottom
-    const log = document.getElementById('game-chat-log');
-    if(log) log.scrollTop = log.scrollHeight;
+async function startRealMatchmaking(){
+  if(sbIsSearching)return;
+  sbIsSearching=true;
+  sbPlayerId='p_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
+  const myName=getPlayerName(),myRating=getPlayerRating();
+  let elapsed=0;
+  document.getElementById('sb-status-dot').style.color='#2ecc71';
+  showMMSearching(0,'Connecting…');
+  const elTimer=setInterval(()=>{elapsed++;if(sbIsSearching)showMMSearching(elapsed,elapsed<5?'Scanning…':elapsed<15?'Looking worldwide…':'Still searching…');},1000);
+  try{
+    await sbDelete('chess_rooms','host_id=eq.'+sbPlayerId+'&status=eq.waiting').catch(()=>{});
+    await new Promise(res=>setTimeout(res,800));
+    let joined=false,attempts=0;
+    while(!joined&&attempts<5){
+      attempts++;
+      const open=await sbSelect('chess_rooms','status=eq.waiting&order=created_at.asc&limit=20');
+      if(!open||open.length===0)break;
+      const now=Date.now();
+      const valid=(open||[]).filter(r=>r.host_id!==sbPlayerId&&(now-new Date(r.created_at).getTime())<300000);
+      if(valid.length===0)break;
+      for(const room of valid){
+        try{
+          const result=await sbUpdate('chess_rooms','id=eq.'+room.id+'&status=eq.waiting',{guest_id:sbPlayerId,guest_name:myName,guest_rating:myRating,status:'playing'});
+          if(result&&result.length>0){
+            sbRoomId=room.id;sbPlayerColor='b';sbOpponentName=room.host_name||'Opponent';
+            joined=true;clearInterval(elTimer);
+            storeOpponentRating(room.host_rating||1200);
+            showMMFound(sbOpponentName,room.host_rating||1200,'b');
+            connectRealtime(sbRoomId);
+            setTimeout(()=>{if(sbIsSearching)startOnlineGame('b',sbOpponentName);},1500);
+            break;
+          }
+        }catch(e){continue;}
+      }
+      if(!joined)await new Promise(res=>setTimeout(res,800));
+    }
+    if(!joined){
+      sbRoomId='r_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
+      sbPlayerColor='w';
+      const matchMode=window._currentOnlineTab||'quick';
+      await sbInsert('chess_rooms',{id:sbRoomId,host_id:sbPlayerId,host_name:myName,host_rating:myRating,status:'waiting',board_state:'',current_turn:'w',last_move:'',mode:matchMode});
+      connectRealtime(sbRoomId);
+      showMMSearching(elapsed,'Waiting for opponent…');
+      let pollCount=0;
+      sbPollTimer=setInterval(async()=>{
+        if(!sbIsSearching){clearInterval(sbPollTimer);return;}
+        pollCount++;
+        try{
+          const rows=await sbSelect('chess_rooms','id=eq.'+sbRoomId);
+          if(rows&&rows.length>0){
+            if(rows[0].status==='playing'&&rows[0].guest_id){
+              clearInterval(sbPollTimer);clearInterval(elTimer);
+              sbOpponentName=rows[0].guest_name||'Opponent';
+              storeOpponentRating(rows[0].guest_rating||1200);
+              showMMFound(sbOpponentName,rows[0].guest_rating||1200,'w');
+              setTimeout(()=>{if(sbIsSearching)startOnlineGame('w',sbOpponentName);},1500);
+            }
+          }else if(pollCount>10)cancelRealMatchmaking();
+        }catch(e){}
+      },1500);
+      setTimeout(()=>{
+        if(sbIsSearching&&sbPlayerColor==='w'){
+          clearInterval(sbPollTimer);clearInterval(elTimer);
+          sbDelete('chess_rooms','id=eq.'+sbRoomId).catch(()=>{});
+          sbIsSearching=false;resetMMWrap();
+          sbSystemMsg('No opponent found — try again!');
+        }
+      },90000);
+    }
+  }catch(err){
+    clearInterval(elTimer);sbIsSearching=false;resetMMWrap();
+    document.getElementById('sb-status-dot').style.color='#e74c3c';
+    const errMsg=err.message||'';
+    sbSystemMsg(errMsg.includes('fetch')||errMsg.includes('network')||errMsg.includes('Failed')?'No internet — check WiFi':'Connection error — try again');
+    const mmw=document.getElementById('mm-wrap');
+    if(mmw)mmw.innerHTML=`<div style="text-align:center;padding:10px"><div style="font-size:28px;margin-bottom:8px">📡</div><div style="font-size:11px;color:#e74c3c;letter-spacing:2px;margin-bottom:12px">CONNECTION FAILED</div><button class="mp-btn" onclick="startRealMatchmaking()" style="padding:10px 30px;font-size:12px;letter-spacing:2px;width:100%">🔄 TRY AGAIN</button></div>`;
   }
 }
 
-function showGameChatBtn(){
-  const btn = document.getElementById('chat-toggle-btn');
-  if(btn) btn.style.display = 'inline-flex';
+function cancelRealMatchmaking(){
+  sbIsSearching=false;clearInterval(sbPollTimer);clearInterval(window.sbTimerSync);
+  if(sbRoomId&&sbPlayerColor==='w')sbDelete('chess_rooms','id=eq.'+sbRoomId+'&status=eq.waiting').catch(()=>{});
+  if(realtimeWS){try{realtimeWS.close();}catch(e){}realtimeWS=null;}
+  sbRoomId=null;sbPlayerColor=null;resetMMWrap();
+  const chatEl=document.getElementById('online-chat-panel');if(chatEl)chatEl.style.display='none';
+  showScreen('online-screen');
 }
 
-function hideGameChatBtn(){
-  const btn = document.getElementById('chat-toggle-btn');
-  if(btn) btn.style.display = 'none';
-  const panel = document.getElementById('game-chat-panel');
-  if(panel) panel.style.display = 'none';
-  gameChatOpen = false;
+function startOnlineGame(myColor,opponentName){
+  sbIsSearching=false;
+  const chatEl=document.getElementById('online-chat-panel');if(chatEl)chatEl.style.display='block';
+  document.getElementById('ai-chat-log').innerHTML='';
+  sbSystemMsg('Connected to '+opponentName+' — Game starts!');
+  const myLabel=getPlayerName()+'('+(myColor==='w'?'⬜ White':'⬛ Black')+')';
+  const oppLabel=opponentName+'('+(myColor==='w'?'⬛ Black':'⬜ White')+')';
+  document.getElementById('p1-name').textContent=myLabel;
+  document.getElementById('p2-name').textContent=oppLabel;
+  window.sbBoardFlipped=(myColor==='b');
+  sbPlayerColor=myColor;
+  gameMode='supabase';
+  initBoard();clearInterval(timerInterval);timers={w:600,b:600};
+  showScreen('game-screen');renderBoard();updateStatus();
+  if(myColor==='w'){
+    startTimer();
+    window.sbTimerSync=setInterval(()=>{if(realtimeWS&&realtimeWS.readyState===1)realtimeWS.sbSend('timer_sync',{player:sbPlayerId,wTime:timers.w,bTime:timers.b,turn});},5000);
+  }else{startTimer();}
+  AUD.startTheme();showBannerAd();showGameChatBtn();
+  setTimeout(()=>{addGameChatMsg('Chat with '+opponentName+' — tap CHAT','system');},500);
 }
 
-function addGameChatMsg(msg, type='opponent'){
-  const log = document.getElementById('game-chat-log');
-  if(!log) return;
-  const div = document.createElement('div');
-  div.className = 'chat-msg ' + type;
-  div.textContent = msg;
-  log.appendChild(div);
-  log.scrollTop = log.scrollHeight;
-  // Show unread badge if chat is closed
-  if(!gameChatOpen && type === 'opponent'){
-    gameChatUnread++;
-    updateChatBadge();
-  }
+function sendOnlineMove(mv){
+  if(gameMode!=='supabase'||!realtimeWS||realtimeWS.readyState!==1)return;
+  realtimeWS.sbSend('move',{player:sbPlayerId,move:mv});
+  sbUpdate('chess_rooms','id=eq.'+sbRoomId,{last_move:JSON.stringify(mv),current_turn:turn}).catch(()=>{});
 }
 
-function updateChatBadge(){
-  const btn = document.getElementById('chat-toggle-btn');
-  if(!btn) return;
-  if(gameChatUnread > 0){
-    btn.textContent = '💬 CHAT (' + gameChatUnread + ')';
-    btn.style.color = '#e74c3c';
-    btn.style.borderColor = '#e74c3c';
-  } else {
-    btn.textContent = '💬 CHAT';
-    btn.style.color = '';
-    btn.style.borderColor = '';
-  }
-}
-
-function sendGameChat(){
-  const inp = document.getElementById('game-chat-input');
-  const msg = (inp?.value || '').trim();
-  if(!msg) return;
-  inp.value = '';
-  addGameChatMsg(getPlayerFlag() + ' You: ' + msg, 'you');
-  // Send via Supabase realtime
-  if(gameMode === 'supabase' && realtimeWS?.readyState === 1){
-    realtimeWS.sbSend('chat', {player: sbPlayerId, msg});
-  }
-}
-
-function sendGameQuickReply(msg){
-  const inp = document.getElementById('game-chat-input');
-  if(inp) inp.value = msg;
-  sendGameChat();
+/* ══ SUPABASE REALTIME ══ */
+function sbRealtime(roomId,onEvent){
+  if(realtimeWS){try{realtimeWS.close();}catch(e){}}
+  const wsUrl=SUPA_URL.replace('https://','wss://')+'/realtime/v1/websocket?apikey='+SUPA_KEY+'&vsn=1.0.0';
+  const ws=new WebSocket(wsUrl);
+  let hb=null;
+  ws.onopen=()=>{
+    ws.send(JSON.stringify({topic:'realtime:chessx_room_'+roomId,event:'phx_join',payload:{config:{broadcast:{self:false},presence:{key:''}}},ref:'1'}));
+    hb=setInterval(()=>{if(ws.readyState===1)ws.send(JSON.stringify({topic:'phoenix',event:'heartbeat',payload:{},ref:'hb'}));},20000);
+  };
+  ws.onmessage=(e)=>{
+    try{const msg=JSON.parse(e.data);if(msg.event==='broadcast'&&msg.payload)onEvent(msg.payload.event,msg.payload.payload);}catch(err){}
+  };
+  ws.onclose=()=>{clearInterval(hb);};
+  ws.sbSend=(event,payload)=>{
+    if(ws.readyState!==1)return;
+    ws.send(JSON.stringify({topic:'realtime:chessx_room_'+roomId,event:'broadcast',payload:{event,payload},ref:Date.now().toString()}));
+  };
+  return ws;
 }
 
 
-/* ── INIT ── */
+/* ══ INIT ══ */
 ['click','touchstart','keydown'].forEach(ev=>{
   document.addEventListener(ev,()=>AUD.unlock(),{once:true,passive:true});
 });
+
 window.addEventListener('load',()=>{
   applyBoardTheme();
   buildSwatches();
