@@ -2169,7 +2169,10 @@ function startGame(mode,diff){
   initBoard();clearInterval(timerInterval);timers={w:600,b:600};
   const nm={easy:'Squire',medium:'Black Knight',hard:'Iron Warlord'};
   if(mode==='single'){document.getElementById('p1-name').textContent='YOUR ARMY';document.getElementById('p2-name').textContent=(nm[diff]||'AI').toUpperCase();}
-  else if(mode==='local'){document.getElementById('p1-name').textContent='PLAYER 1';document.getElementById('p2-name').textContent='PLAYER 2';}
+  else if(mode==='local'){
+    document.getElementById('p1-name').textContent='⬜ PLAYER 1';
+    document.getElementById('p2-name').textContent='⬛ PLAYER 2';
+  }
   else if(mode==='online'){document.getElementById('p1-name').textContent='YOUR ARMY';document.getElementById('p2-name').textContent=AIH.getName().toUpperCase();}
   else{document.getElementById('p1-name').textContent='YOUR ARMY';document.getElementById('p2-name').textContent='OPPONENT';}
   document.getElementById('move-log').innerHTML='<span style="color:var(--text-dim);font-family:sans-serif;font-size:9px">The battle begins…</span>';
@@ -2210,9 +2213,8 @@ const kId=gameMode==='conquest'&&piece.color==='b'&&activeConquestKingdom?active
 function updateCaptured(){const pc={P:'♟',R:'♜',N:'♞',B:'♝',Q:'♛',K:'♚'};document.getElementById('p1-caps').textContent=capturedB.map(p=>pc[p]||p).join('');document.getElementById('p2-caps').textContent=capturedW.map(p=>pc[p]||p).join('');}
 function handleClick(r,c){
   // ── MULTIPLAYER GUARD ──
-  // In online modes, only allow interaction on YOUR turn with YOUR pieces
-  if(gameMode==='supabase'||gameMode==='p2p'){
-    // Block entirely if it's not your turn
+  // Only block in ONLINE modes — local hotseat allows both players to move
+  if(gameMode==='supabase'){
     if(turn !== sbPlayerColor) return;
   }
 
@@ -2230,7 +2232,7 @@ function handleClick(r,c){
     }
     // Reselect only YOUR pieces
     if(piece&&piece.color===turn){
-      if((gameMode==='supabase'||gameMode==='p2p')&&piece.color!==sbPlayerColor){
+      if(gameMode==='supabase'&&piece.color!==sbPlayerColor){
         selected=null;legalMoves=[];renderBoard();return;
       }
       selected={r,c};legalMoves=getLegalMoves(r,c);renderBoard();return;
@@ -2240,8 +2242,8 @@ function handleClick(r,c){
 
   // Initial selection — only YOUR color pieces
   if(piece&&piece.color===turn){
-    if((gameMode==='supabase'||gameMode==='p2p')&&piece.color!==sbPlayerColor){
-      return; // Can't select opponent's pieces
+    if(gameMode==='supabase'&&piece.color!==sbPlayerColor){
+      return;
     }
     selected={r,c};legalMoves=getLegalMoves(r,c);renderBoard();
   }
@@ -2474,7 +2476,7 @@ function updateStatus(){
   if(ic)AUD.playCheck();
 
   // Multiplayer: show clear YOUR TURN / WAITING message
-  if(gameMode==='supabase'||gameMode==='p2p'){
+  if(gameMode==='supabase'){
     const isMyTurn = turn===sbPlayerColor;
     const statusEl = document.getElementById('status-text');
     if(isMyTurn){
@@ -3322,10 +3324,28 @@ async function startRealMatchmaking(){
   } catch(err){
     clearInterval(elTimer);
     console.error('Matchmaking error:', err);
-    sbSystemMsg('Connection error: '+err.message);
-    resetMMWrap();
+    // Show error but STAY on online screen - don't go to main menu
     sbIsSearching = false;
+    resetMMWrap();
     document.getElementById('sb-status-dot').style.color='#e74c3c';
+    // Show friendly error message
+    const errMsg = err.message||'Unknown error';
+    if(errMsg.includes('fetch')||errMsg.includes('network')||errMsg.includes('Failed')){
+      sbSystemMsg('No internet connection — check your WiFi and try again');
+    } else {
+      sbSystemMsg('Connection error — please try again');
+    }
+    // Show retry button
+    const mmw = document.getElementById('mm-wrap');
+    if(mmw) mmw.innerHTML = `
+      <div style="text-align:center;padding:10px">
+        <div style="font-size:28px;margin-bottom:8px">📡</div>
+        <div style="font-size:11px;color:#e74c3c;letter-spacing:2px;margin-bottom:12px">CONNECTION FAILED</div>
+        <button class="mp-btn" onclick="startRealMatchmaking()"
+          style="padding:10px 30px;font-size:12px;letter-spacing:2px;width:100%">
+          🔄 TRY AGAIN
+        </button>
+      </div>`;
   }
 }
 
@@ -3550,7 +3570,7 @@ function cancelRealMatchmaking(){
   resetMMWrap();
   const chatEl=document.getElementById('online-chat-panel');
   if(chatEl)chatEl.style.display='none';
-  showScreen('title-screen');
+  showScreen('online-screen');
 }
 
 // ── Send move to opponent via Realtime ──
