@@ -340,6 +340,242 @@ body{color:var(--text);font-family:'Cinzel',serif;}
 .cv-sub{font-size:clamp(11px,2.5vw,15px);color:var(--text-dim);letter-spacing:3px;margin-bottom:20px;}
 .crowns-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;font-size:28px;margin-bottom:24px;}
 
+
+/* ══ RANKING & LEADERBOARD ══ */
+#leaderboard-screen{
+  flex-direction:column;align-items:center;
+  padding:0 0 var(--ad-h);
+  background:radial-gradient(ellipse at top,#0a0800 0%,#040306 70%);
+  overflow-y:auto;
+}
+.lb-header{
+  width:100%;padding:20px 16px 12px;
+  background:linear-gradient(180deg,rgba(10,8,0,0.98),transparent);
+  text-align:center;position:sticky;top:0;z-index:10;
+  border-bottom:1px solid rgba(201,168,76,0.2);
+}
+.lb-title{
+  font-family:'Cinzel Decorative',cursive;
+  font-size:clamp(18px,5vw,28px);color:var(--gold-light);
+  text-shadow:0 0 20px rgba(201,168,76,0.6);letter-spacing:3px;
+}
+.lb-tabs{display:flex;gap:8px;justify-content:center;margin-top:12px;}
+.lb-tab{
+  padding:6px 16px;background:rgba(0,0,0,0.4);
+  border:1px solid #2a1a08;border-radius:2px;
+  color:var(--text-dim);font-family:'Cinzel',serif;
+  font-size:10px;letter-spacing:2px;cursor:pointer;transition:all 0.2s;
+}
+.lb-tab.active{border-color:var(--gold);color:var(--gold-light);background:rgba(201,168,76,0.1);}
+/* Player profile card */
+.my-rank-card{
+  width:100%;max-width:520px;margin:14px auto;
+  padding:0 14px;
+}
+.rank-card-inner{
+  background:linear-gradient(135deg,rgba(201,168,76,0.08),rgba(0,0,0,0.5));
+  border:1px solid var(--gold-dark);border-radius:6px;
+  padding:16px;display:flex;align-items:center;gap:14px;
+}
+.rank-badge-big{
+  width:64px;height:64px;border-radius:50%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border:2px solid var(--gold);font-size:24px;flex-shrink:0;
+  background:radial-gradient(circle,rgba(201,168,76,0.2),rgba(0,0,0,0.8));
+}
+.rank-badge-name{font-size:8px;color:var(--gold);letter-spacing:1px;margin-top:2px;}
+.rank-stats{flex:1;}
+.rank-player-name{font-size:15px;color:var(--gold-light);letter-spacing:2px;font-weight:700;}
+.rank-rating-big{font-size:28px;color:var(--gold-light);font-family:'Cinzel',serif;font-weight:700;line-height:1;}
+.rank-rating-label{font-size:9px;color:var(--text-dim);letter-spacing:2px;}
+.rank-wld{display:flex;gap:12px;margin-top:8px;}
+.rank-wld-item{text-align:center;}
+.rank-wld-num{font-size:16px;font-weight:700;}
+.rank-wld-num.w{color:#2ecc71;}
+.rank-wld-num.l{color:#e74c3c;}
+.rank-wld-num.d{color:#f39c12;}
+.rank-wld-lbl{font-size:8px;color:var(--text-dim);letter-spacing:2px;}
+/* Leaderboard table */
+.lb-list{width:100%;max-width:520px;margin:0 auto;padding:0 14px 20px;}
+.lb-row{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;margin-bottom:6px;
+  background:rgba(0,0,0,0.35);border:1px solid rgba(201,168,76,0.12);
+  border-radius:4px;transition:all 0.2s;
+}
+.lb-row:hover{border-color:rgba(201,168,76,0.3);background:rgba(201,168,76,0.05);}
+.lb-row.me{border-color:var(--gold);background:rgba(201,168,76,0.1);}
+.lb-pos{
+  font-size:13px;font-weight:700;color:var(--text-dim);
+  width:28px;text-align:center;flex-shrink:0;
+}
+.lb-pos.top1{color:#FFD700;}
+.lb-pos.top2{color:#C0C0C0;}
+.lb-pos.top3{color:#CD7F32;}
+.lb-badge{font-size:20px;flex-shrink:0;}
+.lb-info{flex:1;}
+.lb-name{font-size:12px;color:var(--text);letter-spacing:1px;font-weight:600;}
+.lb-rank-name{font-size:9px;color:var(--text-dim);letter-spacing:2px;margin-top:1px;}
+.lb-rating{font-size:16px;color:var(--gold-light);font-weight:700;font-family:'Cinzel',serif;flex-shrink:0;}
+.lb-wl{font-size:9px;color:var(--text-dim);text-align:right;}
+/* Rank up notification */
+#rank-up-toast{
+  position:fixed;top:20%;left:50%;transform:translateX(-50%);
+  z-index:8000;background:linear-gradient(135deg,#1c1006,#2a1808);
+  border:2px solid var(--gold);border-radius:8px;
+  padding:20px 28px;text-align:center;
+  display:none;animation:toastIn 0.4s ease;
+  min-width:260px;
+}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) scale(0.8)}to{opacity:1;transform:translateX(-50%) scale(1)}}
+.toast-rank-badge{font-size:48px;margin-bottom:8px;}
+.toast-title{font-size:11px;color:var(--gold);letter-spacing:3px;margin-bottom:6px;}
+.toast-rating{font-size:24px;color:var(--gold-light);font-weight:700;}
+.toast-delta{font-size:14px;margin-top:4px;}
+.toast-delta.up{color:#2ecc71;}
+.toast-delta.down{color:#e74c3c;}
+/* Rating change animation in result modal */
+.rating-change-wrap{
+  margin:12px 0;padding:12px;
+  background:rgba(201,168,76,0.08);border:1px solid var(--gold-dark);
+  border-radius:4px;
+}
+.rc-old{font-size:12px;color:var(--text-dim);}
+.rc-new{font-size:20px;color:var(--gold-light);font-weight:700;}
+.rc-delta{font-size:14px;font-weight:700;}
+.rc-delta.up{color:#2ecc71;}
+.rc-delta.down{color:#e74c3c;}
+
+
+/* ══ SHOP SCREEN ══ */
+#shop-screen{
+  flex-direction:column;align-items:center;
+  padding:0 0 80px;
+  background:radial-gradient(ellipse at top,#0a0800 0%,#040306 70%);
+  overflow-y:auto;
+}
+.shop-header{
+  width:100%;padding:20px 16px 14px;
+  background:linear-gradient(180deg,rgba(10,8,0,0.98),transparent);
+  text-align:center;position:sticky;top:0;z-index:10;
+  border-bottom:1px solid rgba(201,168,76,0.2);
+}
+.shop-title{
+  font-family:'Cinzel Decorative',cursive;
+  font-size:clamp(18px,5vw,26px);color:var(--gold-light);
+  letter-spacing:3px;text-shadow:0 0 20px rgba(201,168,76,0.4);
+}
+.shop-body{width:100%;max-width:520px;padding:14px 14px 0;}
+.shop-section-title{
+  font-size:10px;color:var(--gold);letter-spacing:3px;
+  font-family:'Cinzel',serif;margin:18px 0 10px;
+  display:flex;align-items:center;gap:8px;
+}
+.shop-section-title::after{
+  content:'';flex:1;height:1px;
+  background:linear-gradient(90deg,rgba(201,168,76,0.4),transparent);
+}
+/* VIP Card */
+.vip-hero-card{
+  background:linear-gradient(135deg,rgba(201,168,76,0.12),rgba(0,0,0,0.6));
+  border:2px solid var(--gold);border-radius:8px;
+  padding:18px;margin-bottom:6px;
+}
+.vip-hero-top{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+.vip-crown-icon{
+  width:56px;height:56px;border-radius:50%;
+  background:rgba(201,168,76,0.2);border:2px solid var(--gold);
+  display:flex;align-items:center;justify-content:center;font-size:28px;
+}
+.vip-hero-name{font-size:18px;color:var(--gold-light);font-family:'Cinzel',serif;font-weight:700;}
+.vip-hero-sub{font-size:11px;color:var(--text-dim);margin-top:3px;letter-spacing:1px;}
+.vip-benefits-list{
+  display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px;
+}
+.vip-benefit-item{
+  display:flex;align-items:flex-start;gap:7px;
+  background:rgba(0,0,0,0.3);border-radius:4px;padding:8px;
+}
+.vip-benefit-item .bi2{font-size:14px;flex-shrink:0;margin-top:1px;}
+.vib-name{font-size:11px;color:var(--gold-light);font-weight:600;letter-spacing:0.5px;}
+.vib-tag{font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-top:1px;}
+.vip-price-row{display:flex;gap:8px;}
+.vip-price-opt{
+  flex:1;background:rgba(0,0,0,0.4);border:1px solid rgba(201,168,76,0.3);
+  border-radius:6px;padding:10px;text-align:center;cursor:pointer;
+  transition:all 0.2s;
+}
+.vip-price-opt:hover{border-color:var(--gold);background:rgba(201,168,76,0.1);}
+.vip-price-amt{font-size:20px;color:var(--gold-light);font-weight:700;font-family:'Cinzel',serif;}
+.vip-price-lbl{font-size:9px;color:var(--text-dim);letter-spacing:2px;margin-top:2px;}
+/* Shop item cards */
+.shop-items-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.shop-item{
+  background:rgba(0,0,0,0.35);border:1px solid rgba(201,168,76,0.15);
+  border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:5px;
+  position:relative;
+}
+.shop-item.free-item{border-color:rgba(46,204,113,0.2);}
+.shop-item-icon{font-size:24px;line-height:1;}
+.shop-item-name{font-size:12px;color:var(--gold-light);font-weight:600;letter-spacing:1px;}
+.shop-item-desc{font-size:10px;color:var(--text-dim);line-height:1.5;flex:1;}
+.shop-item-price{
+  font-size:12px;font-weight:700;margin-top:4px;
+  font-family:'Cinzel',serif;
+}
+.shop-item-price.free{color:#2ecc71;}
+.shop-item-price.paid{color:var(--gold-light);}
+.shop-item-price.vip-only{color:var(--gold);}
+.shop-badge{
+  position:absolute;top:8px;right:8px;
+  font-size:8px;padding:2px 5px;border-radius:3px;letter-spacing:1px;font-weight:700;
+}
+.shop-badge.vip{background:rgba(201,168,76,0.2);color:var(--gold);border:1px solid rgba(201,168,76,0.4);}
+.shop-badge.free{background:rgba(46,204,113,0.15);color:#2ecc71;border:1px solid rgba(46,204,113,0.3);}
+.shop-badge.new{background:rgba(231,76,60,0.2);color:#e74c3c;border:1px solid rgba(231,76,60,0.4);}
+/* Theme swatches */
+.theme-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;}
+.theme-card{
+  background:rgba(0,0,0,0.35);border:1px solid rgba(201,168,76,0.15);
+  border-radius:6px;overflow:hidden;cursor:pointer;
+}
+.theme-board{display:grid;grid-template-columns:repeat(4,1fr);height:44px;}
+.theme-sq{aspect-ratio:1;}
+.theme-info{padding:5px 7px;display:flex;justify-content:space-between;align-items:center;}
+.theme-info-name{font-size:10px;color:var(--gold-light);letter-spacing:1px;}
+.theme-lock{font-size:9px;color:var(--text-dim);}
+/* Fair play banner */
+.fair-banner{
+  display:flex;align-items:center;gap:10px;
+  background:rgba(46,204,113,0.08);border:1px solid rgba(46,204,113,0.2);
+  border-radius:6px;padding:10px 12px;margin:10px 0;
+}
+.fair-banner-text{font-size:10px;color:rgba(46,204,113,0.85);line-height:1.5;letter-spacing:0.5px;}
+/* Coming soon overlay */
+.coming-soon-btn{
+  width:100%;padding:11px;margin-top:6px;
+  background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.3);
+  border-radius:4px;color:var(--gold);font-family:'Cinzel',serif;
+  font-size:11px;letter-spacing:2px;cursor:pointer;transition:all 0.2s;
+}
+.coming-soon-btn:hover{background:rgba(201,168,76,0.2);}
+.owned-btn{
+  width:100%;padding:11px;margin-top:6px;
+  background:rgba(46,204,113,0.1);border:1px solid rgba(46,204,113,0.3);
+  border-radius:4px;color:#2ecc71;font-family:'Cinzel',serif;
+  font-size:11px;letter-spacing:2px;
+}
+
+
+/* In-game chat */
+#chat-toggle-btn{ position:relative; }
+.chat-notif-dot{
+  position:absolute;top:-4px;right:-4px;
+  width:8px;height:8px;border-radius:50%;
+  background:#e74c3c;border:1px solid #000;
+  animation:pulse 1s infinite;display:none;
+}
+
 /* SHARED */
 .mode-screen{flex-direction:column;align-items:center;justify-content:center;padding:28px 18px 75px;gap:18px;background:radial-gradient(ellipse at top,#1a0a05 0%,#040306 60%);}
 .scr-title{font-family:'Cinzel Decorative',cursive;font-size:clamp(18px,5vw,34px);color:var(--gold-light);text-shadow:0 0 22px rgba(201,168,76,0.55);letter-spacing:4px;text-align:center;}
@@ -407,7 +643,7 @@ body{color:var(--text);font-family:'Cinzel',serif;}
 input[type=range].vol-slider{flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--gold) var(--val,50%),#2a2a3a var(--val,50%));outline:none;cursor:pointer;}
 input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--gold-light);border:2px solid var(--gold-dark);cursor:pointer;}
 /* GAME */
-#game-screen{flex-direction:column;align-items:center;padding:9px 9px 68px;gap:7px;background:radial-gradient(ellipse at center,#1c0f05 0%,#060408 100%);}
+#game-screen{flex-direction:column;align-items:center;padding:6px 6px 68px;gap:5px;background:radial-gradient(ellipse at center,#1c0f05 0%,#060408 100%);}
 .game-hdr{display:flex;align-items:center;justify-content:space-between;width:100%;max-width:540px;padding:6px 11px;background:rgba(0,0,0,0.45);border:1px solid var(--gold-dark);border-radius:2px;}
 .p-info{display:flex;align-items:center;gap:8px;}
 .p-avatar{width:38px;height:38px;border-radius:50%;border:2px solid var(--gold-dark);display:flex;align-items:center;justify-content:center;font-size:18px;background:linear-gradient(135deg,#2a1a08,#180f05);}
@@ -416,10 +652,10 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
 .p-timer{font-size:19px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums;min-width:56px;text-align:right;}
 .p-timer.urgent{color:var(--crimson-light);animation:blink 0.5s infinite alternate;}
 @keyframes blink{from{opacity:1}to{opacity:0.3}}
-.board-wrap{position:relative;width:min(95vw,520px);aspect-ratio:1;}
-.coord-c,.coord-r{position:absolute;display:flex;font-size:8px;color:var(--gold-dark);font-weight:700;font-family:'Cinzel',serif;}
-.coord-c{bottom:-13px;left:0;width:100%;justify-content:space-around;padding:0 5%;}
-.coord-r{top:0;left:-13px;flex-direction:column;height:100%;justify-content:space-around;padding:5% 0;align-items:center;}
+.board-wrap{position:relative;width:min(92vw,480px);aspect-ratio:1;margin:0 auto;}
+.coord-c,.coord-r{position:absolute;display:flex;font-size:clamp(7px,1.8vw,9px);color:var(--gold-dark);font-weight:700;font-family:'Cinzel',serif;letter-spacing:0;}
+.coord-c{bottom:-14px;left:0;width:100%;justify-content:space-around;padding:0 4%;}
+.coord-r{top:0;left:-14px;flex-direction:column;height:100%;justify-content:space-around;padding:4% 0;align-items:center;}
 #board{width:100%;height:100%;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border:3px solid var(--gold-dark);box-shadow:0 0 45px rgba(201,168,76,0.3),inset 0 0 20px rgba(0,0,0,0.5);}
 .cell{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;}
 .cell.light{background:var(--bl);}
@@ -506,6 +742,7 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
   <button class="menu-btn" onclick="showScreen('conquest-screen');initConquest()"><span class="bi">🗺️</span>World Conquest</button>
   <button class="menu-btn" onclick="showScreen('online-screen')"><span class="bi">🌍</span>Play Online</button>
   <button class="menu-btn" onclick="showScreen('settings-screen')"><span class="bi">⚙️</span>Settings</button>
+  <button class="menu-btn" onclick="showScreen('shop-screen')" style="background:linear-gradient(135deg,rgba(201,168,76,0.15),rgba(201,168,76,0.05));border-color:var(--gold)"><span class="bi">🛒</span>Shop <span style="font-size:9px;background:#c9a84c;color:#000;padding:1px 5px;border-radius:3px;margin-left:4px;vertical-align:middle">NEW</span></button>
   <div class="ver-tag">ChessX v2.0</div>
 </div>
 <!-- SINGLE -->
@@ -560,11 +797,34 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
 
   <!-- Player profile -->
   <div class="mp-panel" id="online-profile-panel">
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-      <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#c9a84c,#8a6010);display:flex;align-items:center;justify-content:center;font-size:22px;border:2px solid var(--gold)">♔</div>
+    <!-- Player Profile -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+      <!-- Avatar with country flag -->
+      <div style="position:relative;flex-shrink:0">
+        <div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#c9a84c,#8a6010);display:flex;align-items:center;justify-content:center;font-size:24px;border:2px solid var(--gold)" id="player-avatar-flag">♔</div>
+      </div>
+      <!-- Name + country + rating -->
       <div style="flex:1;text-align:left">
-        <input id="player-display-name" value="Commander" style="background:none;border:none;border-bottom:1px solid var(--gold-dark);color:var(--gold-light);font-family:Cinzel,serif;font-size:13px;letter-spacing:2px;width:140px;outline:none;padding:2px 0" maxlength="16" placeholder="Your name">
-        <div style="font-size:10px;color:var(--text-dim);font-family:sans-serif;margin-top:4px">🏆 Rating: <span id="player-rating">1200</span> &nbsp;|&nbsp; <span style="color:#2ecc71">● Live</span></div>
+        <!-- Editable name -->
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <input id="player-display-name" value="Commander"
+            style="background:none;border:none;border-bottom:1px solid var(--gold-dark);color:var(--gold-light);font-family:Cinzel,serif;font-size:13px;letter-spacing:2px;width:130px;outline:none;padding:2px 0"
+            maxlength="16" placeholder="Your name"
+            onchange="savePlayerProfile()" oninput="savePlayerProfile()">
+          <span style="font-size:9px;color:var(--text-dim);letter-spacing:1px">✏️</span>
+        </div>
+        <!-- Country selector -->
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          <select id="player-country" onchange="savePlayerProfile()"
+            style="background:#1a0e04;border:1px solid var(--gold-dark);color:var(--gold-light);font-size:12px;padding:2px 4px;border-radius:3px;outline:none;cursor:pointer;max-width:180px">
+          </select>
+        </div>
+        <!-- Rating + rank -->
+        <div style="font-size:10px;color:var(--text-dim);font-family:sans-serif">
+          <span id="player-rank-emoji">🥉</span>
+          Rating: <span id="player-rating">1200</span>
+          &nbsp;|&nbsp; <span style="color:#2ecc71">● Live</span>
+        </div>
       </div>
     </div>
     <!-- Mode tabs -->
@@ -578,8 +838,9 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
     </div>
     <!-- Friend room code (shown in friend tab) -->
     <div id="friend-code-section" style="display:none;margin-bottom:12px">
-      <p style="font-size:10px;color:var(--text-dim);font-family:sans-serif;margin-bottom:8px;text-align:center">Share this code with your friend:</p>
-      <div class="room-code" id="friend-room-code" onclick="copyFriendCode()" style="font-size:24px;letter-spacing:6px">------</div>
+      <p style="font-size:10px;color:var(--text-dim);font-family:sans-serif;margin-bottom:8px;text-align:center">Share this 6-letter code with your friend:</p>
+      <div class="room-code" id="friend-room-code" onclick="copyFriendCode()" style="font-size:32px;letter-spacing:8px;color:var(--gold-light);font-family:Cinzel,serif;font-weight:700">------</div>
+      <button class="mp-btn" onclick="copyFriendCode()" style="margin-top:8px;padding:8px;font-size:11px;letter-spacing:2px;width:100%">📋 COPY CODE</button>
       <p style="font-size:9px;color:var(--text-dim);font-family:sans-serif;margin-top:6px;text-align:center">Or enter their code:</p>
       <div style="display:flex;gap:8px;margin-top:6px">
         <input class="mp-input" id="friend-join-input" maxlength="6" placeholder="XXXXXX" oninput="this.value=this.value.toUpperCase()" style="font-size:16px;letter-spacing:4px;flex:1;margin:0">
@@ -616,6 +877,10 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
     </div>
   </div>
 
+    <button class="mp-btn" onclick="showScreen('leaderboard-screen');loadLeaderboard('global')"
+    style="padding:10px;font-size:11px;letter-spacing:2px;width:100%;background:rgba(201,168,76,0.08);border-color:rgba(201,168,76,0.3)">
+    🏆 VIEW RANKINGS
+  </button>
   <button class="back-btn" onclick="cancelRealMatchmaking()">← BACK</button>
 </div>
 <!-- SETTINGS -->
@@ -689,6 +954,292 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
   <button class="menu-btn" onclick="document.getElementById('conquest-victory').classList.remove('show');showScreen('title-screen')">🏠 MAIN MENU</button>
 </div>
 
+
+<!-- ══ LEADERBOARD SCREEN ══ -->
+<div id="leaderboard-screen" class="screen">
+  <div class="lb-header">
+    <div class="lb-title">🏆 GLOBAL RANKINGS</div>
+    <div style="font-size:9px;color:var(--text-dim);letter-spacing:3px;margin-top:4px">RANKED MODE LEADERBOARD</div>
+    <div class="lb-tabs">
+      <button class="lb-tab active" id="lbt-global" onclick="loadLeaderboard('global')">🌍 Global</button>
+      <button class="lb-tab" id="lbt-weekly" onclick="loadLeaderboard('weekly')">📅 Weekly</button>
+    </div>
+  </div>
+
+  <!-- My rank card -->
+  <div class="my-rank-card">
+    <div class="rank-card-inner" id="my-rank-card">
+      <div class="rank-badge-big" id="my-rank-badge-big">
+        <span id="my-rank-emoji">🥉</span>
+        <span class="rank-badge-name" id="my-rank-tier-name">BRONZE</span>
+      </div>
+      <div class="rank-stats">
+        <div class="rank-player-name" id="my-rank-player-name">Commander</div>
+        <div class="rank-rating-big" id="my-rank-rating">1200</div>
+        <div class="rank-rating-label">ELO RATING</div>
+        <div class="rank-wld">
+          <div class="rank-wld-item">
+            <div class="rank-wld-num w" id="my-rank-wins">0</div>
+            <div class="rank-wld-lbl">WINS</div>
+          </div>
+          <div class="rank-wld-item">
+            <div class="rank-wld-num l" id="my-rank-losses">0</div>
+            <div class="rank-wld-lbl">LOSSES</div>
+          </div>
+          <div class="rank-wld-item">
+            <div class="rank-wld-num d" id="my-rank-draws">0</div>
+            <div class="rank-wld-lbl">DRAWS</div>
+          </div>
+          <div class="rank-wld-item">
+            <div class="rank-wld-num" style="color:var(--gold)" id="my-rank-pos">#—</div>
+            <div class="rank-wld-lbl">GLOBAL</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaderboard list -->
+  <div class="lb-list" id="lb-list">
+    <div style="text-align:center;padding:30px;color:var(--text-dim);font-family:sans-serif;font-size:12px">
+      Loading rankings…
+    </div>
+  </div>
+
+  <button class="back-btn" style="margin:0 auto 20px" onclick="showScreen('online-screen')">← BACK</button>
+</div>
+
+<!-- Rank Up Toast Notification -->
+<div id="rank-up-toast">
+  <div class="toast-rank-badge" id="toast-badge">🥇</div>
+  <div class="toast-title" id="toast-title">RANK UP!</div>
+  <div class="toast-rating" id="toast-rating">1200</div>
+  <div class="toast-delta up" id="toast-delta">+18</div>
+  <div style="font-size:10px;color:var(--text-dim);margin-top:8px;letter-spacing:2px" id="toast-tier">PROMOTED TO GOLD!</div>
+  <button class="menu-btn" onclick="document.getElementById('rank-up-toast').style.display='none'"
+    style="margin-top:12px;padding:8px;font-size:10px;letter-spacing:2px">
+    CLAIM ✓
+  </button>
+</div>
+
+
+<!-- ══ SHOP SCREEN ══ -->
+<div id="shop-screen" class="screen">
+  <div class="shop-header">
+    <div class="shop-title">🛒 SHOP</div>
+    <div style="font-size:9px;color:var(--text-dim);letter-spacing:3px;margin-top:4px">NEXORA GAMING STUDIOS</div>
+  </div>
+
+  <div class="shop-body">
+
+    <!-- Fair play banner -->
+    <div class="fair-banner">
+      <span style="font-size:18px">🛡️</span>
+      <div class="fair-banner-text">Zero pay-to-win — VIP never gives an advantage over free players in online matches. All purchases are cosmetic or single player only.</div>
+    </div>
+
+    <!-- VIP MEMBERSHIP -->
+    <div class="shop-section-title">👑 VIP MEMBERSHIP</div>
+    <div class="vip-hero-card">
+      <div class="vip-hero-top">
+        <div class="vip-crown-icon">👑</div>
+        <div>
+          <div class="vip-hero-name">VIP COMMANDER</div>
+          <div class="vip-hero-sub">ALL 10 BENEFITS · FOREVER</div>
+        </div>
+      </div>
+      <div class="vip-benefits-list">
+        <div class="vip-benefit-item"><span class="bi2">🚫</span><div><div class="vib-name">No Ads</div><div class="vib-tag">ALL MODES</div></div></div>
+        <div class="vip-benefit-item"><span class="bi2">👑</span><div><div class="vib-name">VIP Badge</div><div class="vib-tag">ONLINE PROFILE</div></div></div>
+        <div class="vip-benefit-item"><span class="bi2">🎨</span><div><div class="vib-name">All Themes</div><div class="vib-tag">9 BOARD THEMES</div></div></div>
+        <div class="vip-benefit-item"><span class="bi2">⚔️</span><div><div class="vib-name">Elite Pieces</div><div class="vib-tag">GOLD PACK</div></div></div>
+        <div class="vip-benefit-item"><span class="bi2">⏱️</span><div><div class="vib-name">Extended Timer</div><div class="vib-tag">VS AI ONLY</div></div></div>
+        <div class="vip-benefit-item"><span class="bi2">↩️</span><div><div class="vib-name">Unlimited Undo</div><div class="vib-tag">PRACTICE ONLY</div></div></div>
+        <div class="vip-benefit-item"><span class="bi2">📊</span><div><div class="vib-name">Full Stats</div><div class="vib-tag">ACCURACY + MORE</div></div></div>
+        <div class="vip-benefit-item"><span class="bi2">🖼️</span><div><div class="vib-name">Profile Frames</div><div class="vib-tag">4 STYLES</div></div></div>
+        <div class="vip-benefit-item"><span class="bi2">🏰</span><div><div class="vib-name">+3 Kingdoms</div><div class="vib-tag">AZTEC · BYZANTINE · MONGOL</div></div></div>
+        <div class="vip-benefit-item"><span class="bi2">🏆</span><div><div class="vib-name">VIP Rooms</div><div class="vib-tag">LONG ONLINE GAMES</div></div></div>
+      </div>
+      <div class="vip-price-row">
+        <div class="vip-price-opt" onclick="showComingSoon()">
+          <div class="vip-price-amt">$0.99</div>
+          <div class="vip-price-lbl">PER MONTH</div>
+        </div>
+        <div class="vip-price-opt" onclick="showComingSoon()">
+          <div class="vip-price-amt">$4.99</div>
+          <div class="vip-price-lbl">FOREVER ONE-TIME</div>
+        </div>
+      </div>
+      <button class="coming-soon-btn" onclick="showComingSoon()">🚀 COMING ON FULL LAUNCH</button>
+    </div>
+
+    <!-- REMOVE ADS -->
+    <div class="shop-section-title">🚫 REMOVE ADS</div>
+    <div class="shop-items-row" style="grid-template-columns:1fr">
+      <div class="shop-item">
+        <div class="shop-badge new">POPULAR</div>
+        <div class="shop-item-icon">🚫</div>
+        <div class="shop-item-name">REMOVE ALL ADS</div>
+        <div class="shop-item-desc">Permanently removes all banner ads from every game mode. Clean full-screen gameplay forever. One purchase, no expiry.</div>
+        <div class="shop-item-price paid">$1.99 one-time</div>
+        <button class="coming-soon-btn" onclick="showComingSoon()">🚀 COMING ON FULL LAUNCH</button>
+      </div>
+    </div>
+
+    <!-- BOARD THEMES -->
+    <div class="shop-section-title">🎨 BOARD THEMES</div>
+    <div class="theme-row">
+      <div class="theme-card" onclick="previewTheme('classic')">
+        <div class="theme-board">
+          <div class="theme-sq" style="background:#f0d9b5"></div><div class="theme-sq" style="background:#b58863"></div>
+          <div class="theme-sq" style="background:#b58863"></div><div class="theme-sq" style="background:#f0d9b5"></div>
+        </div>
+        <div class="theme-info"><span class="theme-info-name">Classic</span><span class="theme-lock" style="color:#2ecc71">FREE</span></div>
+      </div>
+      <div class="theme-card" onclick="previewTheme('marble')">
+        <div class="theme-board">
+          <div class="theme-sq" style="background:#e8e0d4"></div><div class="theme-sq" style="background:#9a8878"></div>
+          <div class="theme-sq" style="background:#9a8878"></div><div class="theme-sq" style="background:#e8e0d4"></div>
+        </div>
+        <div class="theme-info"><span class="theme-info-name">Marble</span><span class="theme-lock" style="color:#2ecc71">FREE</span></div>
+      </div>
+      <div class="theme-card" onclick="previewTheme('forest')">
+        <div class="theme-board">
+          <div class="theme-sq" style="background:#d4e8c0"></div><div class="theme-sq" style="background:#5a7a40"></div>
+          <div class="theme-sq" style="background:#5a7a40"></div><div class="theme-sq" style="background:#d4e8c0"></div>
+        </div>
+        <div class="theme-info"><span class="theme-info-name">Forest</span><span class="theme-lock" style="color:#2ecc71">FREE</span></div>
+      </div>
+      <div class="theme-card" onclick="previewTheme('ocean')">
+        <div class="theme-board">
+          <div class="theme-sq" style="background:#b8d4e8"></div><div class="theme-sq" style="background:#3a6080"></div>
+          <div class="theme-sq" style="background:#3a6080"></div><div class="theme-sq" style="background:#b8d4e8"></div>
+        </div>
+        <div class="theme-info"><span class="theme-info-name">Ocean</span><span class="theme-lock" style="color:#2ecc71">FREE</span></div>
+      </div>
+      <div class="theme-card" onclick="previewTheme('obsidian')">
+        <div class="theme-board">
+          <div class="theme-sq" style="background:#d0d0d0"></div><div class="theme-sq" style="background:#181818"></div>
+          <div class="theme-sq" style="background:#181818"></div><div class="theme-sq" style="background:#d0d0d0"></div>
+        </div>
+        <div class="theme-info"><span class="theme-info-name">Obsidian</span><span class="theme-lock" style="color:#2ecc71">FREE</span></div>
+      </div>
+      <div class="theme-card" onclick="showComingSoon()">
+        <div class="theme-board">
+          <div class="theme-sq" style="background:#d0c0e8"></div><div class="theme-sq" style="background:#6040a0"></div>
+          <div class="theme-sq" style="background:#6040a0"></div><div class="theme-sq" style="background:#d0c0e8"></div>
+        </div>
+        <div class="theme-info"><span class="theme-info-name">Crystal</span><span class="theme-lock">👑 VIP</span></div>
+      </div>
+      <div class="theme-card" onclick="showComingSoon()">
+        <div class="theme-board">
+          <div class="theme-sq" style="background:#f5c060"></div><div class="theme-sq" style="background:#c04010"></div>
+          <div class="theme-sq" style="background:#c04010"></div><div class="theme-sq" style="background:#f5c060"></div>
+        </div>
+        <div class="theme-info"><span class="theme-info-name">Dragon Fire</span><span class="theme-lock">👑 VIP</span></div>
+      </div>
+      <div class="theme-card" onclick="showComingSoon()">
+        <div class="theme-board">
+          <div class="theme-sq" style="background:#c0c8f8"></div><div class="theme-sq" style="background:#101840"></div>
+          <div class="theme-sq" style="background:#101840"></div><div class="theme-sq" style="background:#c0c8f8"></div>
+        </div>
+        <div class="theme-info"><span class="theme-info-name">Galaxy</span><span class="theme-lock">👑 VIP</span></div>
+      </div>
+      <div class="theme-card" onclick="showComingSoon()">
+        <div class="theme-board">
+          <div class="theme-sq" style="background:#e88080"></div><div class="theme-sq" style="background:#600010"></div>
+          <div class="theme-sq" style="background:#600010"></div><div class="theme-sq" style="background:#e88080"></div>
+        </div>
+        <div class="theme-info"><span class="theme-info-name">Blood Moon</span><span class="theme-lock">👑 VIP</span></div>
+      </div>
+    </div>
+
+    <!-- PIECE PACKS -->
+    <div class="shop-section-title">♟ PIECE PACKS</div>
+    <div class="shop-items-row">
+      <div class="shop-item free-item">
+        <div class="shop-badge free">FREE</div>
+        <div class="shop-item-icon">♟</div>
+        <div class="shop-item-name">WARRIOR PIECES</div>
+        <div class="shop-item-desc">Current soldier style. Pawn, knight, bishop, rook, queen, king as warriors.</div>
+        <div class="shop-item-price free">✓ Included</div>
+        <button class="owned-btn">✓ ACTIVE</button>
+      </div>
+      <div class="shop-item">
+        <div class="shop-badge vip">VIP</div>
+        <div class="shop-item-icon">⚔️</div>
+        <div class="shop-item-name">ELITE GOLD PACK</div>
+        <div class="shop-item-desc">Premium gold & silver warrior pieces with extra detail. Exclusive VIP style.</div>
+        <div class="shop-item-price vip-only">VIP or $2.99</div>
+        <button class="coming-soon-btn" onclick="showComingSoon()">🚀 COMING SOON</button>
+      </div>
+      <div class="shop-item free-item">
+        <div class="shop-badge free">FREE</div>
+        <div class="shop-item-icon">♔</div>
+        <div class="shop-item-name">CLASSIC SYMBOLS</div>
+        <div class="shop-item-desc">Traditional chess symbols. Clean minimal tournament style.</div>
+        <div class="shop-item-price free">✓ Included</div>
+        <button class="owned-btn">✓ AVAILABLE</button>
+      </div>
+    </div>
+
+    <!-- PROFILE -->
+    <div class="shop-section-title">👤 PROFILE</div>
+    <div class="shop-items-row">
+      <div class="shop-item">
+        <div class="shop-badge vip">VIP</div>
+        <div class="shop-item-icon">👑</div>
+        <div class="shop-item-name">VIP BADGE</div>
+        <div class="shop-item-desc">Gold crown next to your name in online matches and leaderboard.</div>
+        <div class="shop-item-price vip-only">VIP only</div>
+        <button class="coming-soon-btn" onclick="showComingSoon()">🚀 COMING SOON</button>
+      </div>
+      <div class="shop-item">
+        <div class="shop-badge vip">VIP</div>
+        <div class="shop-item-icon">🎨</div>
+        <div class="shop-item-name">GOLD NAME</div>
+        <div class="shop-item-desc">Your name appears in gold in chat, lobby and leaderboard.</div>
+        <div class="shop-item-price vip-only">VIP or $0.99</div>
+        <button class="coming-soon-btn" onclick="showComingSoon()">🚀 COMING SOON</button>
+      </div>
+      <div class="shop-item">
+        <div class="shop-badge vip">VIP</div>
+        <div class="shop-item-icon">🖼️</div>
+        <div class="shop-item-name">PROFILE FRAMES</div>
+        <div class="shop-item-desc">Decorative avatar border — Dragon, Viking, Royal, Shadow styles.</div>
+        <div class="shop-item-price vip-only">VIP or $0.99</div>
+        <button class="coming-soon-btn" onclick="showComingSoon()">🚀 COMING SOON</button>
+      </div>
+    </div>
+
+    <!-- CONQUEST -->
+    <div class="shop-section-title">🗺️ CONQUEST MODE</div>
+    <div class="shop-items-row">
+      <div class="shop-item free-item">
+        <div class="shop-badge free">FREE</div>
+        <div class="shop-item-icon">🗺️</div>
+        <div class="shop-item-name">8 KINGDOMS</div>
+        <div class="shop-item-desc">India, Rome, China, Egypt, Middle East, Persia, Japan, Vikings. All included free.</div>
+        <div class="shop-item-price free">✓ Included</div>
+        <button class="owned-btn">✓ ACTIVE</button>
+      </div>
+      <div class="shop-item">
+        <div class="shop-badge new">DLC</div>
+        <div class="shop-item-icon">🏰</div>
+        <div class="shop-item-name">EXTRA KINGDOMS</div>
+        <div class="shop-item-desc">3 bonus kingdoms — Aztec Empire, Byzantine Empire, Mongol Empire. Unique pieces each.</div>
+        <div class="shop-item-price paid">VIP or $1.99</div>
+        <button class="coming-soon-btn" onclick="showComingSoon()">🚀 COMING SOON</button>
+      </div>
+    </div>
+
+    <div style="height:20px"></div>
+  </div>
+
+  <button class="back-btn" onclick="showScreen('title-screen')">← BACK</button>
+</div>
+
+
 <!-- GAME -->
 <div id="game-screen" class="screen">
   <div class="game-hdr"><div class="p-info"><div class="p-avatar" id="p2-avatar">♟</div><div><div class="p-name" id="p2-name">BLACK ARMY</div><div class="p-caps" id="p2-caps"></div></div></div><div class="p-timer" id="p2-timer">10:00</div></div>
@@ -696,7 +1247,36 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
   <div class="game-hdr"><div class="p-info"><div class="p-avatar" id="p1-avatar">♙</div><div><div class="p-name" id="p1-name">WHITE ARMY</div><div class="p-caps" id="p1-caps"></div></div></div><div class="p-timer" id="p1-timer">10:00</div></div>
   <div class="status-bar"><span class="st-text" id="status-text">⚔ WHITE'S TURN</span><span style="display:flex;align-items:center;gap:8px"><span style="font-size:9px;color:var(--text-dim)" id="move-count">Move 1</span><button onclick="quickToggleMusic()" id="music-btn" style="background:none;border:1px solid var(--gold-dark);color:var(--gold);font-size:11px;padding:2px 7px;cursor:pointer;border-radius:2px;letter-spacing:1px" title="Toggle Music">🎵</button></span></div>
   <div class="move-log" id="move-log"><span style="color:var(--text-dim);font-family:sans-serif;font-size:9px">The battle begins…</span></div>
-  <div class="game-btns"><button class="g-btn" onclick="undoMove()">↩ UNDO</button><button class="g-btn" onclick="confirmResign()">🏳 RESIGN</button><button class="g-btn" onclick="goToMenu()">🏠 MENU</button></div>
+  <div class="game-btns">
+  <button class="g-btn" onclick="undoMove()">↩ UNDO</button>
+  <button class="g-btn" onclick="confirmResign()">🏳 RESIGN</button>
+  <button class="g-btn" id="chat-toggle-btn" onclick="toggleGameChat()" style="display:none">💬 CHAT</button>
+  <button class="g-btn" onclick="goToMenu()">🏠 MENU</button>
+</div>
+
+<!-- In-game floating chat panel (online only) -->
+<div id="game-chat-panel" style="display:none;position:fixed;bottom:80px;left:0;right:0;z-index:500;padding:0 10px">
+  <div style="background:rgba(5,3,8,0.96);border:1px solid var(--gold-dark);border-radius:8px;padding:10px;max-width:480px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:10px;color:var(--gold);letter-spacing:2px;font-family:Cinzel,serif">💬 LIVE CHAT</div>
+      <button onclick="toggleGameChat()" style="background:none;border:none;color:var(--text-dim);font-size:14px;cursor:pointer;padding:0">✕</button>
+    </div>
+    <div class="ai-chat-log" id="game-chat-log" style="max-height:120px;margin-bottom:8px"></div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input class="mp-input" id="game-chat-input" placeholder="Message opponent…"
+        style="font-size:11px;letter-spacing:1px;margin:0;flex:1"
+        onkeydown="if(event.key==='Enter')sendGameChat()">
+      <button class="mp-btn" onclick="sendGameChat()" style="margin:0;padding:8px 12px">▶</button>
+    </div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap">
+      <button class="qr-btn" onclick="sendGameQuickReply('gl hf!')">gl hf!</button>
+      <button class="qr-btn" onclick="sendGameQuickReply('nice move!')">nice move!</button>
+      <button class="qr-btn" onclick="sendGameQuickReply('gg')">gg</button>
+      <button class="qr-btn" onclick="sendGameQuickReply('good game!')">good game!</button>
+      <button class="qr-btn" onclick="sendGameQuickReply('well played')">well played</button>
+    </div>
+  </div>
+</div>
 </div>
 <div id="story-dlg"><div class="dlg-speaker" id="dlg-speaker"></div><div class="dlg-text" id="dlg-text"></div><div class="dlg-cont"><button onclick="nextDialog()">Continue ▶</button></div></div>
 <div class="modal-ov" id="result-modal"><div class="modal-box"><div style="font-size:52px" id="res-icon">🏆</div><h2 id="res-title">VICTORY!</h2><p id="res-desc"></p><button class="menu-btn" onclick="closeModal('result-modal');startGame(currentMode,currentDifficulty)">⚔ REMATCH</button><button class="menu-btn" onclick="closeModal('result-modal');goToMenu()">🏠 MENU</button></div></div>
@@ -836,7 +1416,11 @@ function showScreen(id){
   document.getElementById(id).classList.add('active');
   if(id==='mp-screen') generateRoomCode();
   if(id==='settings-screen') buildSwatches();
-  if(id==='online-screen') setTimeout(checkSupabaseStatus, 100);
+  if(id==='online-screen'){
+    setTimeout(checkSupabaseStatus, 100);
+    setTimeout(cleanStaleRooms, 500);
+    setTimeout(loadPlayerProfile, 50); // load saved name + flag
+  }
 }
 function closeModal(id){document.getElementById(id).classList.remove('active');}
 function goToMenu(){clearInterval(timerInterval);AUD.stopTheme();document.getElementById('story-dlg').classList.remove('show');showScreen('title-screen');}
@@ -865,21 +1449,53 @@ function sendChat(){
 function cancelMatchmaking(){AIH.cancel();showScreen('title-screen');}
 
 function setOnlineTab(tab){
+  // Cancel any active search when switching tabs
+  if(sbIsSearching) cancelRealMatchmaking();
+
+  window._currentOnlineTab = tab;
   document.querySelectorAll('.om-tab').forEach(t=>t.classList.remove('active'));
   const el=document.getElementById('tab-'+tab);
   if(el) el.classList.add('active');
-  const content=document.getElementById('online-tab-content');
+
+  const fs=document.getElementById('friend-code-section');
+  const mmWrap=document.getElementById('mm-wrap');
+
+  // Reset UI
+  if(fs) fs.style.display='none';
+
   const msgs={
-    quick:'Find a random opponent instantly. Casual games, no rating change.',
-    ranked:'Compete for rating points. Matched with players near your skill level.',
-    friend:'Challenge a friend — share your room code from the Multiplayer menu.'
+    quick: 'Find a random opponent instantly worldwide.<br>Casual game — no rating change.',
+    ranked:'Compete for rating points.<br>Matched with players near your skill level.',
+    friend:'Enter your friend\'s code below,<br>or share your code for them to join you.'
   };
-  if(content) content.innerHTML=`<p style="font-size:10px;color:var(--text-dim);margin-bottom:14px;font-family:sans-serif;text-align:center;line-height:1.5">${msgs[tab]}</p>`;
-  // Animate the online count
-  const base={quick:2847,ranked:1203,friend:0};
-  const tabCountEl=document.getElementById('online-count');
-  if(tabCountEl) tabCountEl.textContent=base[tab]?(base[tab]+Math.floor(Math.random()*100)).toLocaleString():'—';
-  window._currentOnlineTab=tab;
+  const content=document.getElementById('online-tab-content');
+  if(content) content.innerHTML=`<p style="font-size:10px;color:var(--text-dim);margin-bottom:10px;font-family:sans-serif;text-align:center;line-height:1.7">${msgs[tab]}</p>`;
+
+  if(tab==='friend'){
+    // Show friend section — DO NOT auto-create room yet
+    if(fs) fs.style.display='block';
+    // Only show Generate button — room created when player clicks it
+    if(mmWrap) mmWrap.innerHTML=`
+      <button class="mp-btn" onclick="generateAndShowFriendCode()"
+        style="padding:10px;font-size:12px;letter-spacing:2px;width:100%;margin-bottom:8px">
+        🔑 GENERATE MY CODE
+      </button>`;
+    // Reset code display
+    const codeEl=document.getElementById('friend-room-code');
+    if(codeEl) codeEl.textContent='------';
+  } else {
+    // Quick or Ranked — show Find Match button
+    if(mmWrap) mmWrap.innerHTML=`
+      <button class="mp-btn" onclick="startRealMatchmaking()"
+        style="padding:12px 40px;font-size:13px;letter-spacing:3px;width:100%">
+        ⚔ FIND ${tab==='ranked'?'RANKED ':''}MATCH
+      </button>`;
+  }
+
+  // Update player count display
+  const counts={quick:'2,847+',ranked:'1,203+',friend:'—'};
+  const countEl=document.getElementById('online-count');
+  if(countEl) countEl.textContent=counts[tab]||'—';
 }
 
 /* ── PIECE SVGs ── */
@@ -888,10 +1504,123 @@ function pieceSVG(type,color){
   const svgs={
     P:`<svg viewBox="0 0 60 80" xmlns="http://www.w3.org/2000/svg"><ellipse cx="30" cy="74" rx="20" ry="5" fill="${stroke}" opacity="0.7"/><rect x="18" y="66" width="8" height="8" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/><rect x="34" y="66" width="8" height="8" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/><rect x="21" y="52" width="6" height="16" fill="${fill}" stroke="${stroke}" stroke-width="1"/><rect x="33" y="52" width="6" height="16" fill="${fill}" stroke="${stroke}" stroke-width="1"/><rect x="16" y="34" width="28" height="20" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="20" y="37" width="20" height="14" rx="2" fill="${accent}" opacity="0.3"/><rect x="8" y="35" width="10" height="5" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/><rect x="42" y="35" width="10" height="5" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/><rect x="46" y="10" width="3" height="30" fill="${stroke}"/><polygon points="47.5,5 44,14 51,14" fill="${accent}"/><rect x="25" y="26" width="10" height="10" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/><ellipse cx="30" cy="24" rx="13" ry="12" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="17" y="24" width="26" height="6" rx="1" fill="${stroke}" opacity="0.5"/><rect x="25" y="12" width="10" height="6" rx="2" fill="${accent}"/><rect x="21" y="22" width="7" height="2" rx="1" fill="${eye}"/><rect x="32" y="22" width="7" height="2" rx="1" fill="${eye}"/></svg>`,
     R:`<svg viewBox="0 0 60 90" xmlns="http://www.w3.org/2000/svg"><ellipse cx="30" cy="85" rx="22" ry="5" fill="${stroke}" opacity="0.7"/><rect x="10" y="60" width="40" height="25" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="13" y="35" width="34" height="28" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="10" y="18" width="40" height="20" rx="1" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="10" y="8" width="9" height="13" rx="1" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="25" y="8" width="10" height="13" rx="1" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="41" y="8" width="9" height="13" rx="1" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><path d="M24 85 L24 65 Q30 58 36 65 L36 85 Z" fill="${stroke}" opacity="0.5"/><rect x="24" y="42" width="12" height="10" rx="2" fill="${stroke}" opacity="0.5"/></svg>`,
-    N:`<svg viewBox="0 0 60 90" xmlns="http://www.w3.org/2000/svg"><ellipse cx="30" cy="85" rx="22" ry="5" fill="${stroke}" opacity="0.7"/><ellipse cx="30" cy="70" rx="18" ry="10" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="14" y="72" width="5" height="14" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/><rect x="22" y="74" width="5" height="12" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/><rect x="33" y="74" width="5" height="12" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/><rect x="41" y="72" width="5" height="14" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/><path d="M36 65 Q45 55 48 42 Q46 35 40 32 Q30 28 28 38 Q26 48 30 58 Z" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><path d="M42 38 Q48 30 44 22 Q40 18 38 28 Q44 32 42 38" fill="${accent}" opacity="0.7"/><rect x="18" y="50" width="18" height="20" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><ellipse cx="27" cy="45" rx="10" ry="11" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><path d="M27 34 Q20 20 24 10 Q28 6 30 14 Q32 6 36 10 Q40 20 33 34" fill="${accent}" opacity="0.8"/><rect x="19" y="44" width="16" height="5" rx="1" fill="${stroke}" opacity="0.6"/><line x1="45" y1="15" x2="22" y2="55" stroke="${stroke}" stroke-width="3"/><polygon points="45,10 42,18 48,18" fill="${accent}"/></svg>`,
+    N:`<svg viewBox="0 0 60 80" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="30" cy="76" rx="22" ry="5" fill="${stroke}" opacity="0.7"/>
+  <!-- Horse body -->
+  <ellipse cx="32" cy="56" rx="22" ry="14" fill="${stroke}" stroke="${stroke}" stroke-width="1"/>
+  <!-- Horse legs (4 simple legs) -->
+  <rect x="14" y="62" width="6" height="14" rx="2" fill="${stroke}"/>
+  <rect x="22" y="64" width="6" height="12" rx="2" fill="${stroke}"/>
+  <rect x="32" y="64" width="6" height="12" rx="2" fill="${stroke}"/>
+  <rect x="40" y="62" width="6" height="14" rx="2" fill="${stroke}"/>
+  <!-- Horse neck -->
+  <path d="M18 50 Q14 38 18 28 Q22 34 20 48 Z" fill="${stroke}" stroke="${stroke}" stroke-width="1"/>
+  <!-- Horse head -->
+  <ellipse cx="14" cy="24" rx="10" ry="7" fill="${stroke}" stroke="${stroke}" stroke-width="1"/>
+  <!-- Muzzle -->
+  <ellipse cx="6" cy="26" rx="5" ry="4" fill="${stroke}"/>
+  <!-- Horse eye -->
+  <circle cx="16" cy="22" r="2" fill="${eye}"/>
+  <!-- Ear -->
+  <polygon points="18,18 22,10 24,18" fill="${stroke}"/>
+  <!-- Rider torso - clearly separate color from horse -->
+  <rect x="16" y="30" width="20" height="22" rx="3" fill="${fill}" stroke="${accent}" stroke-width="1.5"/>
+  <!-- Rider helmet -->
+  <ellipse cx="26" cy="26" rx="10" ry="9" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+  <path d="M16 28 Q26 16 36 28" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+  <!-- Helmet visor -->
+  <rect x="18" y="24" width="16" height="6" rx="2" fill="${stroke}" opacity="0.5"/>
+  <!-- Eyes through visor -->
+  <circle cx="22" cy="27" r="2" fill="${accent}" opacity="0.9"/>
+  <circle cx="30" cy="27" r="2" fill="${accent}" opacity="0.9"/>
+  <!-- Helmet plume -->
+  <path d="M26 16 Q24 8 26 4 Q28 8 30 4 Q30 8 28 16 Z" fill="#cc2222"/>
+  <!-- Shield on left arm -->
+  <ellipse cx="8" cy="38" rx="6" ry="8" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+  <line x1="8" y1="30" x2="8" y2="46" stroke="${accent}" stroke-width="1"/>
+  <line x1="2" y1="38" x2="14" y2="38" stroke="${accent}" stroke-width="1"/>
+  <!-- Lance on right -->
+  <line x1="42" y1="6" x2="38" y2="50" stroke="${accent}" stroke-width="3"/>
+  <polygon points="42,2 39,10 45,10" fill="${accent}"/>
+</svg>`,
     B:`<svg viewBox="0 0 60 90" xmlns="http://www.w3.org/2000/svg"><ellipse cx="30" cy="85" rx="20" ry="5" fill="${stroke}" opacity="0.7"/><path d="M14 85 L10 60 L20 45 L40 45 L50 60 L46 85 Z" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="18" y="30" width="24" height="18" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="27" y="33" width="6" height="12" fill="${accent}" opacity="0.7"/><rect x="22" y="37" width="16" height="4" fill="${accent}" opacity="0.7"/><rect x="25" y="22" width="10" height="10" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/><ellipse cx="30" cy="20" rx="12" ry="11" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><path d="M18 16 Q30 2 42 16" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="26" y="4" width="8" height="14" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="28" y="2" width="4" height="5" rx="2" fill="${accent}"/></svg>`,
-    Q:`<svg viewBox="0 0 60 95" xmlns="http://www.w3.org/2000/svg"><ellipse cx="30" cy="90" rx="24" ry="5" fill="${stroke}" opacity="0.7"/><path d="M8 90 L12 58 L48 58 L52 90 Z" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="16" y="34" width="28" height="26" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="6" y="36" width="12" height="7" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1"/><rect x="42" y="36" width="12" height="7" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1"/><rect x="4" y="12" width="3" height="30" fill="${stroke}"/><circle cx="5.5" cy="10" r="6" fill="${accent}" opacity="0.9"/><rect x="25" y="26" width="10" height="10" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/><ellipse cx="30" cy="22" rx="13" ry="13" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="17" y="8" width="26" height="8" rx="1" fill="${accent}"/><polygon points="17,8 20,2 23,8" fill="${accent}"/><polygon points="25,8 28,1 31,8" fill="${accent}"/><polygon points="29,8 32,1 35,8" fill="${accent}"/><polygon points="37,8 40,2 43,8" fill="${accent}"/></svg>`,
-    K:`<svg viewBox="0 0 70 100" xmlns="http://www.w3.org/2000/svg"><ellipse cx="35" cy="95" rx="26" ry="6" fill="${stroke}" opacity="0.7"/><path d="M6 95 L10 60 Q22 72 35 68 Q48 72 60 60 L64 95 Z" fill="${accent}" opacity="0.3" stroke="${stroke}" stroke-width="1"/><path d="M12 95 L16 62 L54 62 L58 95 Z" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="18" y="36" width="34" height="28" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="32" y="40" width="6" height="14" fill="${accent}" opacity="0.7"/><rect x="26" y="46" width="18" height="5" fill="${accent}" opacity="0.7"/><ellipse cx="16" cy="40" rx="10" ry="6" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><ellipse cx="54" cy="40" rx="10" ry="6" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="6" y="40" width="12" height="24" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1"/><rect x="52" y="40" width="12" height="24" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1"/><rect x="57" y="10" width="4" height="55" rx="2" fill="${accent}"/><rect x="50" y="38" width="18" height="5" rx="2" fill="${stroke}"/><polygon points="59,6 55,18 63,18" fill="${accent}"/><rect x="28" y="28" width="14" height="10" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1"/><ellipse cx="35" cy="24" rx="16" ry="16" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><path d="M19 22 Q35 8 51 22 L51 30 Q35 38 19 30 Z" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/><rect x="20" y="8" width="30" height="9" rx="1" fill="${accent}"/><rect x="30" y="4" width="10" height="8" rx="1" fill="${accent}"/><rect x="33" y="1" width="4" height="10" fill="${accent}"/><rect x="29" y="4" width="12" height="3" fill="${accent}"/><rect x="20" y="22" width="30" height="7" rx="1" fill="${stroke}" opacity="0.5"/></svg>`
+    Q:`<svg viewBox="0 0 60 80" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="30" cy="76" rx="20" ry="5" fill="${stroke}" opacity="0.7"/>
+  <!-- Dress skirt -->
+  <path d="M12 76 L16 54 L44 54 L48 76 Z" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+  <!-- Belt -->
+  <rect x="16" y="52" width="28" height="5" rx="2" fill="${accent}" opacity="0.7"/>
+  <!-- Body -->
+  <rect x="18" y="36" width="24" height="18" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+  <!-- Arms small -->
+  <rect x="10" y="38" width="9" height="5" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/>
+  <rect x="41" y="38" width="9" height="5" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/>
+  <!-- Fur collar -->
+  <path d="M18 36 Q30 30 42 36" fill="none" stroke="${fill}" stroke-width="4"/>
+  <!-- Neck -->
+  <rect x="25" y="28" width="10" height="10" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/>
+  <!-- Head -->
+  <ellipse cx="30" cy="22" rx="11" ry="10" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+  <!-- Hair -->
+  <path d="M19 20 Q30 10 41 20" fill="${stroke}" stroke="${stroke}" stroke-width="1"/>
+  <!-- Crown compact -->
+  <rect x="20" y="10" width="20" height="6" rx="1" fill="${accent}"/>
+  <polygon points="20,10 22,5 24,10" fill="${accent}"/>
+  <polygon points="27,10 30,4 33,10" fill="${accent}"/>
+  <polygon points="36,10 38,5 40,10" fill="${accent}"/>
+  <!-- Eyes -->
+  <circle cx="26" cy="22" r="2" fill="${eye}"/>
+  <circle cx="34" cy="22" r="2" fill="${eye}"/>
+  <!-- Sword right -->
+  <line x1="46" y1="14" x2="44" y2="52" stroke="${accent}" stroke-width="2"/>
+  <polygon points="46,10 43,17 49,17" fill="${accent}"/>
+  <!-- Shield left -->
+  <ellipse cx="12" cy="44" rx="7" ry="9" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+  <line x1="12" y1="35" x2="12" y2="53" stroke="${accent}" stroke-width="1"/>
+  <line x1="5" y1="44" x2="19" y2="44" stroke="${accent}" stroke-width="1"/>
+</svg>`,
+    K:`<svg viewBox="0 0 60 80" xmlns="http://www.w3.org/2000/svg">
+  <ellipse cx="30" cy="76" rx="22" ry="5" fill="${stroke}" opacity="0.7"/>
+  <!-- Royal robe -->
+  <path d="M10 76 L14 54 L46 54 L50 76 Z" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+  <!-- Gold robe trim -->
+  <line x1="10" y1="76" x2="50" y2="76" stroke="${accent}" stroke-width="2"/>
+  <line x1="14" y1="54" x2="46" y2="54" stroke="${accent}" stroke-width="2"/>
+  <!-- Armour chest -->
+  <rect x="16" y="36" width="28" height="20" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+  <!-- Cross on chest -->
+  <rect x="28" y="38" width="4" height="14" fill="${accent}" opacity="0.8"/>
+  <rect x="22" y="43" width="16" height="4" fill="${accent}" opacity="0.8"/>
+  <!-- Shoulder pauldrons -->
+  <ellipse cx="13" cy="38" rx="8" ry="5" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+  <ellipse cx="47" cy="38" rx="8" ry="5" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+  <!-- Fur collar -->
+  <path d="M16 36 Q30 28 44 36" fill="none" stroke="${fill}" stroke-width="5"/>
+  <!-- Neck -->
+  <rect x="25" y="26" width="10" height="12" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1"/>
+  <!-- Head -->
+  <ellipse cx="30" cy="20" rx="12" ry="11" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+  <!-- Beard -->
+  <path d="M20 24 Q30 32 40 24" fill="${stroke}" stroke="none" opacity="0.7"/>
+  <!-- Moustache -->
+  <path d="M24 20 Q30 16 36 20" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round"/>
+  <!-- Eyes stern -->
+  <circle cx="25" cy="18" r="2.5" fill="${eye}"/>
+  <circle cx="35" cy="18" r="2.5" fill="${eye}"/>
+  <!-- Crown impressive -->
+  <rect x="18" y="7" width="24" height="7" rx="1" fill="${accent}"/>
+  <polygon points="18,7 20,1 23,7" fill="${accent}"/>
+  <polygon points="27,7 30,0 33,7" fill="${accent}"/>
+  <polygon points="37,7 40,1 42,7" fill="${accent}"/>
+  <!-- Crown gems -->
+  <circle cx="20" cy="4" r="2.5" fill="#cc2222"/>
+  <circle cx="30" cy="2" r="2.5" fill="#2244cc"/>
+  <circle cx="40" cy="4" r="2.5" fill="#cc2222"/>
+  <!-- Sceptre -->
+  <line x1="48" y1="8" x2="46" y2="54" stroke="${accent}" stroke-width="3"/>
+  <circle cx="48" cy="7" r="5" fill="${accent}" stroke="${stroke}" stroke-width="1"/>
+  <circle cx="48" cy="7" r="2" fill="#cc2222"/>
+</svg>`
   };return svgs[type]||svgs['P'];
 }
 const CP={P:['♙','♟'],R:['♖','♜'],N:['♘','♞'],B:['♗','♝'],Q:['♕','♛'],K:['♔','♚']};
@@ -1430,6 +2159,7 @@ let enPassantTarget=null,castlingRights={wK:true,wQ:true,bK:true,bQ:true};
 let lastFrom=null,lastTo=null;
 
 function initBoard(){
+  resetDrawTrackers();
   const back=['R','N','B','Q','K','B','N','R'];board=[];
   for(let r=0;r<8;r++){board[r]=[];for(let c=0;c<8;c++){if(r===0)board[r][c]={type:back[c],color:'b'};else if(r===1)board[r][c]={type:'P',color:'b'};else if(r===6)board[r][c]={type:'P',color:'w'};else if(r===7)board[r][c]={type:back[c],color:'w'};else board[r][c]=null;}}
   turn='w';selected=null;legalMoves=[];moveHistory=[];capturedW=[];capturedB=[];enPassantTarget=null;castlingRights={wK:true,wQ:true,bK:true,bQ:true};lastFrom=null;lastTo=null;
@@ -1456,10 +2186,15 @@ function startTimer(){clearInterval(timerInterval);timerInterval=setInterval(()=
 function updateTimerDisplay(){['w','b'].forEach(c=>{const t=timers[c],m=Math.floor(t/60),s=t%60,el=document.getElementById(c==='w'?'p1-timer':'p2-timer');el.textContent=`${m}:${s.toString().padStart(2,'0')}`;el.classList.toggle('urgent',t<=30);});}
 function renderBoard(){
   const bd=document.getElementById('board');bd.innerHTML='';
-  document.getElementById('coord-r').innerHTML='87654321'.split('').map(n=>`<span>${n}</span>`).join('');
-  document.getElementById('coord-c').innerHTML='abcdefgh'.split('').map(l=>`<span>${l}</span>`).join('');
-  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
-    const cell=document.createElement('div');cell.className='cell '+((r+c)%2===0?'light':'dark');cell.dataset.r=r;cell.dataset.c=c;
+  // BUG1 FIX: Flip board coordinates for black player
+  const flipped = window.sbBoardFlipped === true;
+  const rowLabels = flipped ? '12345678' : '87654321';
+  const colLabels = flipped ? 'hgfedcba' : 'abcdefgh';
+  document.getElementById('coord-r').innerHTML=rowLabels.split('').map(n=>`<span>${n}</span>`).join('');
+  document.getElementById('coord-c').innerHTML=colLabels.split('').map(l=>`<span>${l}</span>`).join('');
+  for(let ri=0;ri<8;ri++)for(let ci=0;ci<8;ci++){
+    const r=flipped?7-ri:ri; const c=flipped?7-ci:ci;
+    const cell=document.createElement('div');cell.className='cell '+((r+c)%2===0?'light':'dark');cell.dataset.r=r;cell.dataset.c=c;cell.dataset.ri=ri;cell.dataset.ci=ci;
     const piece=board[r][c];
     if(piece){const dv=document.createElement('div');if(pieceStyle==='classic'){dv.className='piece-classic '+(piece.color==='w'?'pw':'pb');dv.textContent=CP[piece.type][piece.color==='w'?0:1];}else{dv.className='piece';// Use cultural pieces for enemy (black) in conquest mode
 const kId=gameMode==='conquest'&&piece.color==='b'&&activeConquestKingdom?activeConquestKingdom.id:null;dv.innerHTML=kId?culturalPieceSVG(piece.type,piece.color,kId):pieceSVG(piece.type,piece.color);}cell.appendChild(dv);}
@@ -1474,9 +2209,42 @@ const kId=gameMode==='conquest'&&piece.color==='b'&&activeConquestKingdom?active
 }
 function updateCaptured(){const pc={P:'♟',R:'♜',N:'♞',B:'♝',Q:'♛',K:'♚'};document.getElementById('p1-caps').textContent=capturedB.map(p=>pc[p]||p).join('');document.getElementById('p2-caps').textContent=capturedW.map(p=>pc[p]||p).join('');}
 function handleClick(r,c){
+  // ── MULTIPLAYER GUARD ──
+  // In online modes, only allow interaction on YOUR turn with YOUR pieces
+  if(gameMode==='supabase'||gameMode==='p2p'){
+    // Block entirely if it's not your turn
+    if(turn !== sbPlayerColor) return;
+  }
+
   const piece=board[r][c];
-  if(selected){const mv=legalMoves.find(m=>m.r===r&&m.c===c);if(mv){executeMove(selected.r,selected.c,r,c,mv);return;}if(piece&&piece.color===turn){selected={r,c};legalMoves=getLegalMoves(r,c);renderBoard();return;}selected=null;legalMoves=[];renderBoard();return;}
-  if(piece&&piece.color===turn){selected={r,c};legalMoves=getLegalMoves(r,c);renderBoard();}
+
+  if(selected){
+    const mv=legalMoves.find(m=>m.r===r&&m.c===c);
+    if(mv){
+      // Extra guard: confirm the piece being moved belongs to you
+      if((gameMode==='supabase'||gameMode==='p2p')&&board[selected.r][selected.c]&&board[selected.r][selected.c].color!==sbPlayerColor){
+        selected=null;legalMoves=[];renderBoard();return;
+      }
+      executeMove(selected.r,selected.c,r,c,mv);
+      return;
+    }
+    // Reselect only YOUR pieces
+    if(piece&&piece.color===turn){
+      if((gameMode==='supabase'||gameMode==='p2p')&&piece.color!==sbPlayerColor){
+        selected=null;legalMoves=[];renderBoard();return;
+      }
+      selected={r,c};legalMoves=getLegalMoves(r,c);renderBoard();return;
+    }
+    selected=null;legalMoves=[];renderBoard();return;
+  }
+
+  // Initial selection — only YOUR color pieces
+  if(piece&&piece.color===turn){
+    if((gameMode==='supabase'||gameMode==='p2p')&&piece.color!==sbPlayerColor){
+      return; // Can't select opponent's pieces
+    }
+    selected={r,c};legalMoves=getLegalMoves(r,c);renderBoard();
+  }
 }
 function executeMove(fr,fc,tr,tc,mv){
   const piece=board[fr][fc],captured=board[tr][tc];
@@ -1495,14 +2263,43 @@ function executeMove(fr,fc,tr,tc,mv){
   turn=turn==='w'?'b':'w';selected=null;legalMoves=[];renderBoard();updateStatus();
   if(gameMode==='p2p'&&!arguments[5])sendP2PMove({fr,fc,r:tr,c:tc,...mv});
   // Send move to online opponent (Supabase)
-  if(gameMode==='supabase' && !arguments[5]) sendOnlineMove({fr,fc,r:tr,c:tc,...mv});
+  if(gameMode==='supabase' && !arguments[5]){
+    // Final server-side guard: only send if this is your piece
+    const movingPiece = board[fr] && board[fr][fc];
+    if(movingPiece && movingPiece.color !== sbPlayerColor) return;
+    sendOnlineMove({fr,fc,r:tr,c:tc,...mv});
+  }
   // Trigger AI for single/conquest modes
-  if((gameMode==='single'||gameMode==='conquest')&&turn==='b') setTimeout(doAIMove,320+Math.random()*280);
+  if((gameMode==='single'||gameMode==='conquest')&&turn==='b'){
+    // Record AI think start time to properly deduct from AI timer
+    window._aiThinkStart = Date.now();
+    setTimeout(()=>{
+      doAIMove();
+      // Deduct actual think time from AI (black) timer
+      if(window._aiThinkStart){
+        const thinkSecs = Math.round((Date.now()-window._aiThinkStart)/1000);
+        timers.b = Math.max(0, timers.b - thinkSecs);
+        window._aiThinkStart = null;
+        updateTimerDisplay();
+      }
+    }, 100); // small delay so timer ticks at least once
+  }
 }
 function showPromotion(r,c,color){
   const modal=document.getElementById('promo-modal');modal.classList.add('active');
   const choices=document.getElementById('promo-choices');choices.innerHTML='';
-  ['Q','R','B','N'].forEach(type=>{const btn=document.createElement('div');btn.className='promo-ch';if(pieceStyle==='classic'){btn.style.fontSize='28px';btn.textContent=CP[type][color==='w'?0:1];}else btn.innerHTML=pieceSVG(type,color);btn.onclick=()=>{board[r][c]={type,color};modal.classList.remove('active');turn=turn==='w'?'b':'w';selected=null;legalMoves=[];renderBoard();updateStatus();if((gameMode==='single'||gameMode==='online')&&turn==='b')setTimeout(doAIMove,380);};choices.appendChild(btn);});
+  ['Q','R','B','N'].forEach(type=>{const btn=document.createElement('div');btn.className='promo-ch';if(pieceStyle==='classic'){btn.style.fontSize='28px';btn.textContent=CP[type][color==='w'?0:1];}else btn.innerHTML=pieceSVG(type,color);btn.onclick=()=>{board[r][c]={type,color};modal.classList.remove('active');turn=turn==='w'?'b':'w';selected=null;legalMoves=[];renderBoard();updateStatus();if((gameMode==='single'||gameMode==='online')&&turn==='b'){
+      window._aiThinkStart=Date.now();
+      setTimeout(()=>{
+        doAIMove();
+        if(window._aiThinkStart){
+          const ts=Math.round((Date.now()-window._aiThinkStart)/1000);
+          timers.b=Math.max(0,timers.b-ts);
+          window._aiThinkStart=null;
+          updateTimerDisplay();
+        }
+      },100);
+    }};choices.appendChild(btn);});
 }
 
 /* ══════════════════════════════════════════════════════
@@ -1659,13 +2456,69 @@ function hasLM(color){
 }
 
 function updateStatus(){
+  // ── DRAW CONDITIONS — checked FIRST before checkmate ──
+  if(isInsufficientMaterial()){
+    clearInterval(timerInterval);AUD.stopTheme();
+    showResult(null,'insufficient');return;
+  }
+  if(isFiftyMoveRule()){
+    clearInterval(timerInterval);AUD.stopTheme();
+    showResult(null,'fiftymove');return;
+  }
+  if(isThreefoldRepetition()){
+    clearInterval(timerInterval);AUD.stopTheme();
+    showResult(null,'threefold');return;
+  }
   const ic=isInCheck(turn),hm=hasLM(turn);
   if(!hm){clearInterval(timerInterval);AUD.stopTheme();if(ic){AUD.playWin();showResult(turn==='w'?'b':'w','checkmate');}else showResult(null,'stalemate');return;}
   if(ic)AUD.playCheck();
-  document.getElementById('status-text').textContent=(turn==='w'?'⚔ WHITE':'🛡 BLACK')+"'S TURN"+(ic?' ☠ CHECK!':'');
+
+  // Multiplayer: show clear YOUR TURN / WAITING message
+  if(gameMode==='supabase'||gameMode==='p2p'){
+    const isMyTurn = turn===sbPlayerColor;
+    const statusEl = document.getElementById('status-text');
+    if(isMyTurn){
+      statusEl.textContent='⚔ YOUR TURN'+(ic?' ☠ CHECK!':'');
+      statusEl.style.color='#f0d080'; // gold = your turn
+      document.getElementById('board').style.cursor='pointer';
+      document.getElementById('board').style.opacity='1';
+    } else {
+      statusEl.textContent='⏳ WAITING FOR OPPONENT…';
+      statusEl.style.color='#8a7a5a'; // dim = not your turn
+      document.getElementById('board').style.cursor='not-allowed';
+      document.getElementById('board').style.opacity='0.85';
+    }
+    return;
+  }
+
+  // Single player / local
+  const statusEl2 = document.getElementById('status-text');
+  if(gameMode==='single'&&turn==='b'){
+    statusEl2.textContent = '🤖 AI THINKING…';
+    statusEl2.style.color = '#e74c3c';
+  } else {
+    statusEl2.textContent = (turn==='w'?'⚔ YOUR TURN':'🛡 BLACK\'S TURN')+(ic?' ☠ CHECK!':'');
+    statusEl2.style.color = turn==='w'?'#f0d080':'';
+  }
 }
 function showResult(winner,reason){
-  const icons={checkmate:'🏆',stalemate:'🤝',timeout:'⏰',resign:'🏳️'},titles={checkmate:winner==='w'?'WHITE WINS!':'BLACK WINS!',stalemate:'STALEMATE',timeout:"TIME'S UP!",resign:'SURRENDER'},descs={checkmate:`${winner==='w'?'White':'Black'} Army conquered the throne!`,stalemate:'No legal moves remain. An honorable draw.',timeout:`${winner==='w'?'White':'Black'} Army wins! Time expired.`,resign:'Your army has surrendered.'};
+  const bd=document.getElementById('board');
+  if(bd){bd.style.cursor='';bd.style.opacity='1';}
+  clearInterval(window.sbTimerSync);
+  hideGameChatBtn();
+  // Update ranked rating if this was a ranked game
+  if(gameMode==='supabase' && window._currentOnlineTab==='ranked'){
+    handleRankedGameEnd(winner, reason).catch(()=>{});
+  }
+  const icons={checkmate:'🏆',stalemate:'🤝',timeout:'⏰',resign:'🏳️'},titles={checkmate:winner==='w'?'WHITE WINS!':'BLACK WINS!',stalemate:'STALEMATE',timeout:"TIME'S UP!",resign:'SURRENDER'},descs={
+    checkmate:`${winner==='w'?'White':'Black'} Army conquered the throne!`,
+    stalemate:'No legal moves — stalemate! An honorable draw.',
+    timeout:`${winner==='w'?'White':'Black'} Army wins! Time expired.`,
+    resign:'Your army has surrendered.',
+    insufficient:'Only kings remain — insufficient material to checkmate. Draw!',
+    fiftymove:'50 moves without a capture or pawn move. Draw by fifty-move rule!',
+    threefold:'Same position repeated 3 times. Draw by repetition!'
+  };
   document.getElementById('res-icon').textContent=icons[reason]||'🏆';document.getElementById('res-title').textContent=titles[reason]||'GAME OVER';document.getElementById('res-desc').textContent=descs[reason]||'';document.getElementById('result-modal').classList.add('active');
   if(gameMode==='supabase'&&reason==='resign'){
     if(realtimeWS&&realtimeWS.readyState===1) realtimeWS.sbSend('resign',{player:sbPlayerId});
@@ -1849,13 +2702,28 @@ function aiApply(ab,mv){
 // Evaluate ab  (positive=white winning, negative=black winning)
 function aiEval(ab){
   let score=0;
+  let wKing=null,bKing=null;
+  let wPieces=0,bPieces=0;
+
+  // Count total pieces for endgame detection
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=aiGet(ab,r,c); if(!p) continue;
+    if(p.t==='K'){ if(p.c==='w')wKing={r,c}; else bKing={r,c}; }
+    if(p.c==='w') wPieces++; else bPieces++;
+  }
+  const endgame = (wPieces+bPieces) <= 10;
+
   for(let r=0;r<8;r++) for(let c=0;c<8;c++){
     const p=aiGet(ab,r,c); if(!p) continue;
     const pr=p.c==='w'?r:7-r;
+
+    // Base piece value
     let val=PV[p.t]+(PST[p.t]?PST[p.t][pr][c]:0);
-    // Pawn aggression — bonus for threatening enemy
+
+    // ── PAWN evaluation ──
     if(p.t==='P'){
       const dir=p.c==='w'?-1:1;
+      // Attacking bonus
       for(const dc of[-1,1]){
         const nr=r+dir,nc=c+dc;
         if(aiInBounds(nr,nc)){
@@ -1863,30 +2731,112 @@ function aiEval(ab){
           if(ep&&ep.c!==p.c) val+=30;
         }
       }
-      // Passed pawn
+      // Passed pawn bonus — bigger in endgame
       let passed=true;
       const step=p.c==='w'?-1:1;
       for(let rr=r+step;rr>=0&&rr<8;rr+=step){
         const ep=aiGet(ab,rr,c);
         if(ep&&ep.t==='P'&&ep.c!==p.c){passed=false;break;}
       }
-      if(passed) val+=20;
+      if(passed) val+=(endgame?60:25);
+      // Promotion proximity bonus
+      const distToPromo=p.c==='w'?r:7-r;
+      val+=Math.max(0,(7-distToPromo))*8;
+      // Doubled pawn penalty
+      let doubled=false;
+      for(let rr=0;rr<8;rr++){
+        if(rr!==r){const ep2=aiGet(ab,rr,c);if(ep2&&ep2.t==='P'&&ep2.c===p.c){doubled=true;break;}}
+      }
+      if(doubled) val-=20;
     }
-    // Open file rook
+
+    // ── KNIGHT evaluation ──
+    if(p.t==='N'){
+      // Knights better in center
+      const centerDist=Math.abs(r-3.5)+Math.abs(c-3.5);
+      val+=Math.round((5-centerDist)*8);
+      // Knight outpost bonus
+      if(pr>=4) val+=15;
+    }
+
+    // ── BISHOP evaluation ──
+    if(p.t==='B'){
+      // Bishop pair bonus counted separately
+      let moves=0;
+      for(const [dr,dc] of[[1,1],[1,-1],[-1,1],[-1,-1]]){
+        let nr=r+dr,nc=c+dc;
+        while(aiInBounds(nr,nc)&&!aiGet(ab,nr,nc)){moves++;nr+=dr;nc+=dc;}
+      }
+      val+=moves*3; // mobility
+    }
+
+    // ── ROOK evaluation ──
     if(p.t==='R'){
-      let open=true;
+      let openFile=true,semiOpen=true;
       for(let rr=0;rr<8;rr++){
         const ep=aiGet(ab,rr,c);
-        if(ep&&ep.t==='P'){open=false;break;}
+        if(ep&&ep.t==='P'){
+          if(ep.c===p.c) openFile=false;
+          semiOpen=false;
+        }
       }
-      if(open) val+=18;
+      if(openFile) val+=25;
+      else if(semiOpen) val+=12;
+      // Rook on 7th rank
+      if(pr===6) val+=20;
     }
+
+    // ── QUEEN evaluation ──
+    if(p.t==='Q'){
+      // Penalize early queen development
+      if(pr<=2) val-=10;
+    }
+
+    // ── KING safety ──
+    if(p.t==='K'){
+      if(!endgame){
+        // Middlegame: king should be castled/safe
+        // Penalize king in center
+        const kingCenterDist=Math.abs(c-3.5);
+        if(kingCenterDist<2) val-=40;
+        // Pawn shield bonus
+        const dir2=p.c==='w'?-1:1;
+        for(const dc of[-1,0,1]){
+          const nr=r+dir2,nc=c+dc;
+          if(aiInBounds(nr,nc)){
+            const shield=aiGet(ab,nr,nc);
+            if(shield&&shield.t==='P'&&shield.c===p.c) val+=15;
+          }
+        }
+      } else {
+        // Endgame: king should be active and chase enemy king
+        const oKing=p.c==='w'?bKing:wKing;
+        if(oKing){
+          const dist=Math.abs(r-oKing.r)+Math.abs(c-oKing.c);
+          val+=(14-dist)*8; // Chase opponent king
+        }
+        // King centralization in endgame
+        val+=Math.round((3.5-Math.abs(r-3.5))*10+(3.5-Math.abs(c-3.5))*10);
+      }
+    }
+
     score+=p.c==='w'?val:-val;
   }
+
+  // ── CHECKMATE THREAT: massive bonus for putting opponent in check ──
+  const oppColor=aiInCheck(ab,'b')?'b':'w';
+  if(aiInCheck(ab,'b')) score+=200;  // white has black in check
+  if(aiInCheck(ab,'w')) score-=200;  // black has white in check
+
+  // ── MOBILITY: reward having more legal moves ──
+  const wMoves=aiLegal(ab,'w').length;
+  const bMoves=aiLegal(ab,'b').length;
+  score+=(wMoves-bMoves)*5;
+
   return score;
 }
 
-// Minimax on AI board — pure, no global state touched
+
 function aiMinimax(ab,depth,alpha,beta,isMax){
   if(depth===0) return aiEval(ab);
   const color=isMax?'w':'b';
@@ -1905,13 +2855,21 @@ function aiMinimax(ab,depth,alpha,beta,isMax){
 
 // Main AI entry point — copies global board once, searches, returns best move
 function doAIMove(){
-  const depthMap={easy:1,medium:2,hard:3,conquest:2,online:2};
+  const depthMap={easy:1,medium:3,hard:4,conquest:2,online:2};
   const depth=depthMap[difficulty]||depthMap[gameMode]||2;
 
   // Take snapshot of current global board
   const ab=boardToAI();
-  const moves=aiLegal(ab,'b');
+  let moves=aiLegal(ab,'b');
   if(!moves.length) return;
+  // MVV-LVA move ordering: captures first, then center moves
+  moves.sort((a,b)=>{
+    const capA=aiGet(boardToAI(),a.r,a.c); // target piece value
+    const capB=aiGet(boardToAI(),b.r,b.c);
+    const valA=capA?(PV[capA.t]||0):0;
+    const valB=capB?(PV[capB.t]||0):0;
+    return valB-valA; // higher captures first
+  });
 
   let best=null, bestVal=+Infinity; // BLACK MINIMIZES
 
@@ -2158,7 +3116,9 @@ let sbPollTimer   = null;
 let sbChatChannel = null;
 
 function getPlayerName(){
-  return (document.getElementById('player-display-name')?.value||'Commander').trim().substring(0,16)||'Commander';
+  const saved = getMyPlayerData();
+  const inputVal = document.getElementById('player-display-name')?.value?.trim();
+  return (inputVal || saved.name || 'Commander').substring(0,16) || 'Commander';
 }
 function getPlayerRating(){
   return parseInt(document.getElementById('player-rating')?.textContent)||1200;
@@ -2205,50 +3165,106 @@ function resetMMWrap(){
 async function startRealMatchmaking(){
   if(sbIsSearching) return;
   sbIsSearching = true;
-  sbPlayerId    = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
+  sbPlayerId    = 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
   const myName  = getPlayerName();
   const myRating= getPlayerRating();
   let elapsed   = 0;
 
-  // Update server status indicator
   document.getElementById('sb-status-dot').style.color='#2ecc71';
+  showMMSearching(0, 'Connecting to server…');
 
-  showMMSearching(0, 'Connecting to Supabase…');
-
-  // Elapsed timer
-  const elTimer = setInterval(()=>{ elapsed++; showMMSearching(elapsed, 'Scanning for opponents…'); }, 1000);
+  // Elapsed counter
+  const elTimer = setInterval(()=>{
+    elapsed++;
+    if(sbIsSearching) showMMSearching(elapsed, elapsed<5?'Scanning for opponents…':elapsed<15?'Looking worldwide…':'Still searching… hang tight!');
+  }, 1000);
 
   try{
-    // Step 1: Look for an open room (someone waiting)
-    const open = await sbSelect('chess_rooms', 'status=eq.waiting&order=created_at.asc&limit=1');
+    // ── STEP 1: Clean up own stale rooms first ──
+    // Delete any old waiting rooms this player left behind
+    await sbDelete('chess_rooms', 'host_id=eq.'+sbPlayerId+'&status=eq.waiting').catch(()=>{});
 
-    if(open && open.length > 0 && open[0].host_id !== sbPlayerId){
-      // ── JOIN existing room ──
-      const room = open[0];
-      sbRoomId       = room.id;
-      sbPlayerColor  = 'b';
-      sbOpponentName = room.host_name || 'Opponent';
+    // ── STEP 2: Try to join an existing waiting room ──
+    // Use a retry loop to handle race conditions with multiple players
+    let joined = false;
+    let attempts = 0;
 
-      await sbUpdate('chess_rooms', 'id=eq.'+sbRoomId, {
-        guest_id:   sbPlayerId,
-        guest_name: myName,
-        guest_rating: myRating,
-        status:     'playing'
-      });
+    while(!joined && attempts < 3){
+      attempts++;
 
-      clearInterval(elTimer);
-      showMMFound(sbOpponentName, room.host_rating||1200, 'b');
-      connectRealtime(sbRoomId);
+      // Get oldest waiting room (not hosted by us)
+      const matchMode = window._currentOnlineTab || 'quick';
+      // Match players in same mode (quick vs ranked)
+      // Also accept null/undefined mode for backward compatibility
+      const open = await sbSelect('chess_rooms',
+        'status=eq.waiting&order=created_at.asc&limit=10'
+      );
+      // Filter by mode client-side for flexibility
+      const modeFiltered = (open||[]).filter(r=>
+        !r.mode || r.mode===matchMode || r.mode==='quick'
+      );
 
-      setTimeout(()=>{
-        startOnlineGame('b', sbOpponentName);
-      }, 1500);
+      if(!modeFiltered || modeFiltered.length === 0) break; // no rooms available → become host
 
-    } else {
-      // ── HOST a new room ──
-      sbRoomId      = 'room_' + Date.now() + '_' + Math.random().toString(36).substr(2,8);
+      // Filter out our own rooms — using modeFiltered as 'open' and very old rooms (>2 min = stale)
+      const now = Date.now();
+      const validRooms = modeFiltered.filter(r =>
+        r.host_id !== sbPlayerId &&
+        r.id !== sbRoomId && // not a room we already tried
+        (now - new Date(r.created_at).getTime()) < 120000 // less than 2 min old
+      );
+
+      if(validRooms.length === 0) break;
+
+      // Try to claim the first valid room atomically
+      // Update only if status is STILL 'waiting' (prevents double-join)
+      for(const room of validRooms){
+        try{
+          const result = await sbUpdate('chess_rooms',
+            'id=eq.'+room.id+'&status=eq.waiting', // double-check still waiting
+            {
+              guest_id:     sbPlayerId,
+              guest_name:   myName,
+              guest_rating: myRating,
+              status:       'playing'
+            }
+          );
+
+          // Check if update succeeded (result has our data)
+          if(result && result.length > 0 && result[0].guest_id === sbPlayerId){
+            // Successfully joined!
+            sbRoomId       = room.id;
+            sbPlayerColor  = 'b';
+            sbOpponentName = room.host_name || 'Opponent';
+            joined         = true;
+
+            clearInterval(elTimer);
+            showMMFound(sbOpponentName, room.host_rating||1200, 'b');
+            connectRealtime(sbRoomId);
+
+            setTimeout(()=>{
+              if(sbIsSearching) startOnlineGame('b', sbOpponentName);
+            }, 1500);
+            break;
+          }
+          // else: someone else grabbed this room first, try next
+        } catch(e){
+          continue; // room was taken, try next
+        }
+      }
+
+      if(!joined){
+        // Small delay before retry to reduce race conditions
+        await new Promise(res=>setTimeout(res, 300));
+      }
+    }
+
+    if(!joined){
+      // ── STEP 3: Become host — create a new room ──
+      sbRoomId      = 'r_' + Date.now() + '_' + Math.random().toString(36).substr(2,6);
       sbPlayerColor = 'w';
 
+      const matchMode = window._currentOnlineTab || 'quick';
       await sbInsert('chess_rooms', {
         id:           sbRoomId,
         host_id:      sbPlayerId,
@@ -2257,56 +3273,96 @@ async function startRealMatchmaking(){
         status:       'waiting',
         board_state:  '',
         current_turn: 'w',
-        last_move:    ''
+        last_move:    '',
+        mode:         matchMode
       });
 
-      // Connect realtime while waiting
+      // Connect realtime AFTER room is created in DB
       connectRealtime(sbRoomId);
+      showMMSearching(elapsed, 'Waiting for opponent…');
 
-      showMMSearching(elapsed, 'Room created — waiting for opponent…');
-
-      // Poll for guest joining (check every 2s)
+      // Poll every 1.5s for guest joining (faster detection)
+      let pollCount = 0;
       sbPollTimer = setInterval(async()=>{
+        if(!sbIsSearching){ clearInterval(sbPollTimer); return; }
+        pollCount++;
         try{
-          const rows = await sbSelect('chess_rooms','id=eq.'+sbRoomId);
-          if(rows && rows.length > 0 && rows[0].status === 'playing'){
-            clearInterval(sbPollTimer);
-            clearInterval(elTimer);
-            sbOpponentName = rows[0].guest_name || 'Opponent';
+          const rows = await sbSelect('chess_rooms', 'id=eq.'+sbRoomId);
+          if(rows && rows.length > 0){
+            if(rows[0].status === 'playing' && rows[0].guest_id){
+              clearInterval(sbPollTimer);
+              clearInterval(elTimer);
+              sbOpponentName = rows[0].guest_name || 'Opponent';
+              storeOpponentRating(rows[0].guest_rating||1200);
             showMMFound(sbOpponentName, rows[0].guest_rating||1200, 'w');
-            setTimeout(()=>{
-              startOnlineGame('w', sbOpponentName);
-            }, 1500);
+              setTimeout(()=>{
+                if(sbIsSearching) startOnlineGame('w', sbOpponentName);
+              }, 1500);
+            }
+          } else {
+            // Room was deleted (stale cleanup) — recreate
+            if(pollCount > 10) cancelRealMatchmaking();
           }
-        }catch(e){}
-      }, 2000);
+        } catch(e){}
+      }, 1500);
 
-      // Timeout after 60s — cancel search
+      // Timeout after 90s
       setTimeout(()=>{
         if(sbIsSearching && sbPlayerColor==='w'){
           clearInterval(sbPollTimer);
           clearInterval(elTimer);
           sbDelete('chess_rooms','id=eq.'+sbRoomId).catch(()=>{});
-          sbIsSearching=false;
+          sbIsSearching = false;
           resetMMWrap();
-          sbSystemMsg('No opponent found. Try again!');
+          sbSystemMsg('No opponent found after 90s — try again!');
         }
-      }, 60000);
+      }, 90000);
     }
 
   } catch(err){
     clearInterval(elTimer);
     console.error('Matchmaking error:', err);
-    sbSystemMsg('Connection error — check your internet');
+    sbSystemMsg('Connection error: '+err.message);
     resetMMWrap();
-    sbIsSearching=false;
+    sbIsSearching = false;
     document.getElementById('sb-status-dot').style.color='#e74c3c';
   }
 }
 
+// ── Clean up stale rooms on page load ──
+async function cleanStaleRooms(){
+  try{
+    // Delete waiting rooms older than 3 minutes
+    const stale = await sbSelect('chess_rooms',
+      'status=eq.waiting&order=created_at.asc'
+    );
+    if(!stale) return;
+    const now = Date.now();
+    for(const r of stale){
+      if((now - new Date(r.created_at).getTime()) > 180000){
+        await sbDelete('chess_rooms','id=eq.'+r.id).catch(()=>{});
+      }
+    }
+  } catch(e){}
+}
+
+
 // ── Friend room (direct invite) ──
+// Called when player clicks GENERATE MY CODE button
+async function generateAndShowFriendCode(){
+  // If already has a code, just show it
+  const existingCode = document.getElementById('friend-room-code')?.textContent;
+  if(existingCode && existingCode !== '------'){
+    sbSystemMsg('Your code: '+existingCode+' — share it!');
+    return;
+  }
+  await startFriendRoom();
+}
+
 async function startFriendRoom(){
-  const code = 'CHESSX' + Math.random().toString(36).substr(2,6).toUpperCase();
+  // Generate clean 6-char alphanumeric code (no confusing chars like 0,O,I,1)
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const code = Array.from({length:6},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
   sbRoomId      = code;
   sbPlayerColor = 'w';
   sbPlayerId    = 'p_'+Date.now();
@@ -2335,7 +3391,7 @@ async function startFriendRoom(){
 
 async function joinFriendRoom(){
   const code = (document.getElementById('friend-join-input')?.value||'').toUpperCase().trim();
-  if(code.length < 6){ sbSystemMsg('Enter a valid room code'); return; }
+  if(code.length !== 6){ sbSystemMsg('Please enter the full 6-character code'); return; }
   sbRoomId       = code;
   sbPlayerColor  = 'b';
   sbPlayerId     = 'p_'+Date.now();
@@ -2356,17 +3412,30 @@ async function joinFriendRoom(){
 }
 
 function copyFriendCode(){
-  const code=document.getElementById('friend-room-code')?.textContent;
-  if(code) navigator.clipboard?.writeText(code).then(()=>sbSystemMsg('Code copied!'));
+  const el=document.getElementById('friend-room-code');
+  const code=el?.textContent?.trim();
+  if(code && code!=='------'){
+    navigator.clipboard?.writeText(code).then(()=>{
+      sbSystemMsg('Code '+code+' copied! Share with your friend');
+      // Flash the code display
+      if(el){ el.style.color='#2ecc71'; setTimeout(()=>el.style.color='',1000); }
+    }).catch(()=>{
+      sbSystemMsg('Your code is: '+code+' — share it manually!');
+    });
+  } else {
+    sbSystemMsg('Please wait — generating code...');
+  }
 }
 
 // ── Realtime connection ──
 function connectRealtime(roomId){
   realtimeWS = sbRealtime(roomId, (event, payload)=>{
-    if(event==='move'  && payload.player !== sbPlayerId) onRemoteMove(payload);
-    if(event==='chat'  && payload.player !== sbPlayerId) onRemoteChat(payload);
-    if(event==='resign'&& payload.player !== sbPlayerId) onRemoteResign();
+    if(event==='move'       && payload.player !== sbPlayerId) onRemoteMove(payload);
+    if(event==='chat'       && payload.player !== sbPlayerId) onRemoteChat(payload);
+    if(event==='resign'     && payload.player !== sbPlayerId) onRemoteResign();
     if(event==='offer_draw') onDrawOffer();
+    // BUG2 FIX: Timer sync from host
+    if(event==='timer_sync' && payload.player !== sbPlayerId) onTimerSync(payload);
   });
 }
 
@@ -2379,12 +3448,19 @@ function startOnlineGame(myColor, opponentName){
   sbSystemMsg('Connected to '+opponentName+' — Game starts!');
   sbAddChat('gl hf!', 'system');
 
-  // Set player names on board
-  document.getElementById('p1-name').textContent = myColor==='w' ? getPlayerName()+' (You)' : opponentName;
-  document.getElementById('p2-name').textContent = myColor==='w' ? opponentName : getPlayerName()+' (You)';
+  // BUG1 FIX: Correct color labels — YOU are always at bottom (p1)
+  // p1 = YOUR side (bottom), p2 = OPPONENT (top)
+  const myLabel   = getPlayerName()+' ('+(myColor==='w'?'⬜ White':'⬛ Black')+')';
+  const oppLabel  = opponentName+' ('+(myColor==='w'?'⬛ Black':'⬜ White')+')';
+  document.getElementById('p1-name').textContent = myLabel;
+  document.getElementById('p2-name').textContent = oppLabel;
 
-  // Start game — no AI, wait for remote moves if it's opponent's turn
-  gameMode    = 'supabase';
+  // BUG1 FIX: Flip board for black player so YOUR pieces are at bottom
+  window.sbBoardFlipped = (myColor === 'b');
+
+  // BUG2 FIX: Host controls master timer — guest syncs from DB
+  // Both start from same time, host broadcasts timer every 5s
+  gameMode      = 'supabase';
   sbPlayerColor = myColor;
   initBoard();
   clearInterval(timerInterval);
@@ -2392,9 +3468,35 @@ function startOnlineGame(myColor, opponentName){
   showScreen('game-screen');
   renderBoard();
   updateStatus();
-  startTimer();
+
+  // Timer sync: host starts timer and broadcasts, guest follows
+  if(myColor === 'w'){
+    // Host (white) drives the timer
+    startTimer();
+    // Broadcast timer state every 5 seconds
+    window.sbTimerSync = setInterval(()=>{
+      if(realtimeWS && realtimeWS.readyState===1){
+        realtimeWS.sbSend('timer_sync',{
+          player: sbPlayerId,
+          wTime: timers.w,
+          bTime: timers.b,
+          turn: turn
+        });
+      }
+    }, 5000);
+  } else {
+    // Guest (black) starts timer locally too but syncs from host
+    startTimer();
+  }
+
   AUD.startTheme();
   showBannerAd();
+  // Show chat button for online games
+  showGameChatBtn();
+  // Add welcome message to game chat
+  setTimeout(()=>{
+    addGameChatMsg('💬 Chat with ' + opponentName + ' — tap CHAT button', 'system');
+  }, 500);
 }
 
 // ── Handle incoming opponent move ──
@@ -2408,14 +3510,27 @@ function onRemoteMove(payload){
 
 // ── Handle incoming chat ──
 function onRemoteChat(payload){
-  sbAddChat(sbOpponentName+': '+payload.msg, 'opponent');
-  AUD.playMove(); // subtle notification
+  const msg = sbOpponentName + ': ' + payload.msg;
+  sbAddChat(msg, 'opponent');
+  // Also add to in-game chat log
+  addGameChatMsg(msg, 'opponent');
+  AUD.playMove();
 }
 
 // ── Handle resign ──
 function onRemoteResign(){
   sbSystemMsg(sbOpponentName+' resigned!');
   showResult('w'===sbPlayerColor?'w':'b','resign');
+}
+
+// BUG2 FIX: Sync timer from host to guest
+function onTimerSync(payload){
+  if(sbPlayerColor === 'b'){
+    // Guest receives authoritative timer from host
+    timers.w = payload.wTime;
+    timers.b = payload.bTime;
+    updateTimerDisplay();
+  }
 }
 function onDrawOffer(){
   sbSystemMsg(sbOpponentName+' offers a draw');
@@ -2425,7 +3540,11 @@ function onDrawOffer(){
 function cancelRealMatchmaking(){
   sbIsSearching = false;
   clearInterval(sbPollTimer);
-  if(sbRoomId) sbDelete('chess_rooms','id=eq.'+sbRoomId).catch(()=>{});
+  clearInterval(window.sbTimerSync);
+  // Only delete room if we were the HOST waiting (not if game started)
+  if(sbRoomId && sbPlayerColor==='w'){
+    sbDelete('chess_rooms','id=eq.'+sbRoomId+'&status=eq.waiting').catch(()=>{});
+  }
   if(realtimeWS){ try{realtimeWS.close();}catch(e){} realtimeWS=null; }
   sbRoomId=null; sbPlayerColor=null;
   resetMMWrap();
@@ -2764,6 +3883,627 @@ function dismissSplash(e){
   setTimeout(()=>{ if(splash.parentNode) splash.parentNode.removeChild(splash); },380);
 }
 
+
+/* ══════════════════════════════════════════════════════════
+   ELO RANKING SYSTEM — Full implementation
+   - Rank tiers with badges
+   - ELO calculation
+   - Supabase leaderboard
+   - Rating update after ranked games
+   - Rank-up notifications
+══════════════════════════════════════════════════════════ */
+
+// ── RANK TIER DEFINITIONS ──
+const RANK_TIERS = [
+  { name:'GrandMaster', min:2200, emoji:'🔱', color:'#ff6b35', glow:'rgba(255,107,53,0.4)' },
+  { name:'Master',      min:2000, emoji:'👑', color:'#9b59b6', glow:'rgba(155,89,182,0.4)' },
+  { name:'Diamond',     min:1800, emoji:'💎', color:'#00d2ff', glow:'rgba(0,210,255,0.4)' },
+  { name:'Gold',        min:1600, emoji:'🥇', color:'#FFD700', glow:'rgba(255,215,0,0.4)'  },
+  { name:'Silver',      min:1400, emoji:'🥈', color:'#C0C0C0', glow:'rgba(192,192,192,0.4)'},
+  { name:'Bronze',      min:1200, emoji:'🥉', color:'#CD7F32', glow:'rgba(205,127,50,0.4)' },
+  { name:'Iron',        min:1000, emoji:'⚔️', color:'#7f8c8d', glow:'rgba(127,140,141,0.4)'},
+  { name:'Stone',       min:0,    emoji:'🪨', color:'#5d6d7e', glow:'rgba(93,109,126,0.4)' },
+];
+
+function getRankTier(rating){
+  for(const tier of RANK_TIERS){
+    if(rating >= tier.min) return tier;
+  }
+  return RANK_TIERS[RANK_TIERS.length-1];
+}
+
+function getRankProgress(rating){
+  const tier = getRankTier(rating);
+  const tierIdx = RANK_TIERS.indexOf(tier);
+  if(tierIdx === 0) return 100; // GrandMaster = maxed
+  const nextTier = RANK_TIERS[tierIdx-1];
+  const progress = ((rating - tier.min) / (nextTier.min - tier.min)) * 100;
+  return Math.min(100, Math.max(0, Math.round(progress)));
+}
+
+// ── ELO CALCULATION ──
+function calcELO(myRating, oppRating, result){
+  // result: 1=win, 0=loss, 0.5=draw
+  // K factor based on rating
+  const K = myRating < 1400 ? 32 : myRating < 1800 ? 24 : 16;
+  const expected = 1 / (1 + Math.pow(10, (oppRating - myRating) / 400));
+  const change = Math.round(K * (result - expected));
+  return change;
+}
+
+// ── LOCAL PLAYER DATA (stored in localStorage) ──
+function getMyPlayerData(){
+  try{
+    const saved = localStorage.getItem('chessx_player_data');
+    if(saved) return JSON.parse(saved);
+  }catch(e){}
+  return {
+    id:      'p_' + Date.now() + '_' + Math.random().toString(36).substr(2,8),
+    name:    'Commander',
+    rating:  1200,
+    wins:    0,
+    losses:  0,
+    draws:   0,
+    games:   0,
+    history: [] // last 20 rating changes
+  };
+}
+
+function saveMyPlayerData(data){
+  try{ localStorage.setItem('chessx_player_data', JSON.stringify(data)); }catch(e){}
+}
+
+// Sync player data with Supabase
+async function syncPlayerToSupabase(data){
+  try{
+    // Try to update existing record
+    const existing = await sbSelect('players', 'id=eq.'+data.id);
+    if(existing && existing.length > 0){
+      await sbUpdate('players', 'id=eq.'+data.id, {
+        name:   data.name,
+        rating: data.rating,
+        wins:   data.wins,
+        losses: data.losses,
+        draws:  data.draws,
+        games:  data.games
+      });
+    } else {
+      // Insert new player
+      await sbInsert('players', {
+        id:     data.id,
+        name:   data.name,
+        rating: data.rating,
+        wins:   data.wins,
+        losses: data.losses,
+        draws:  data.draws,
+        games:  data.games
+      });
+    }
+  }catch(e){ console.log('Player sync error:', e); }
+}
+
+// ── UPDATE RATING AFTER RANKED GAME ──
+async function updateRankedRating(result, oppRating, oppName){
+  // result: 'win', 'loss', 'draw'
+  const data = getMyPlayerData();
+  const oldRating = data.rating;
+  const oldTier   = getRankTier(oldRating);
+
+  // Calculate ELO change
+  const score   = result==='win' ? 1 : result==='draw' ? 0.5 : 0;
+  const change  = calcELO(data.rating, oppRating, score);
+  data.rating   = Math.max(100, data.rating + change); // min 100
+
+  // Update W/L/D
+  if(result==='win')   data.wins++;
+  else if(result==='loss') data.losses++;
+  else                  data.draws++;
+  data.games++;
+  data.name = getPlayerName();
+
+  // Save rating history
+  data.history.unshift({
+    change, oppName, result,
+    rating: data.rating,
+    date: Date.now()
+  });
+  if(data.history.length > 20) data.history.pop();
+
+  saveMyPlayerData(data);
+
+  // Sync to Supabase in background
+  syncPlayerToSupabase(data).catch(()=>{});
+
+  // Update UI rating display
+  const ratingEl = document.getElementById('player-rating');
+  if(ratingEl) ratingEl.textContent = data.rating;
+
+  // Check for rank tier change
+  const newTier = getRankTier(data.rating);
+  const promoted = newTier.min > oldTier.min;
+  const demoted  = newTier.min < oldTier.min;
+
+  // Show rank change notification in result modal
+  showRatingChange(oldRating, data.rating, change, newTier, promoted, demoted);
+
+  return { oldRating, newRating: data.rating, change, newTier, promoted };
+}
+
+function showRatingChange(oldR, newR, change, tier, promoted, demoted){
+  // Add rating change to result modal
+  const modal = document.getElementById('result-modal');
+  if(!modal) return;
+
+  // Remove any existing rating change block
+  const existing = document.getElementById('rating-change-block');
+  if(existing) existing.remove();
+
+  const block = document.createElement('div');
+  block.id = 'rating-change-block';
+  block.className = 'rating-change-wrap';
+  block.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div class="rc-old">Rating: ${oldR}</div>
+        <div class="rc-new">${tier.emoji} ${newR}</div>
+        <div class="rc-delta ${change>=0?'up':'down'}">${change>=0?'+':''}${change} points</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:36px">${tier.emoji}</div>
+        <div style="font-size:9px;color:${tier.color};letter-spacing:2px">${tier.name.toUpperCase()}</div>
+      </div>
+    </div>
+    ${promoted ? `<div style="color:#2ecc71;font-size:10px;letter-spacing:2px;margin-top:6px;text-align:center">🎉 PROMOTED TO ${tier.name.toUpperCase()}!</div>` : ''}
+    ${demoted  ? `<div style="color:#e74c3c;font-size:10px;letter-spacing:2px;margin-top:6px;text-align:center">↓ Demoted to ${tier.name}</div>` : ''}
+  `;
+
+  // Insert into modal after res-desc
+  const desc = document.getElementById('res-desc');
+  if(desc && desc.parentNode) desc.parentNode.insertBefore(block, desc.nextSibling);
+
+  // Show rank-up toast if promoted
+  if(promoted){
+    setTimeout(()=>showRankUpToast(tier, newR, change), 1500);
+  }
+}
+
+function showRankUpToast(tier, rating, change){
+  const toast = document.getElementById('rank-up-toast');
+  if(!toast) return;
+  document.getElementById('toast-badge').textContent  = tier.emoji;
+  document.getElementById('toast-title').textContent  = 'RANK UP!';
+  document.getElementById('toast-rating').textContent = rating;
+  document.getElementById('toast-delta').textContent  = '+'+change+' points';
+  document.getElementById('toast-tier').textContent   = 'PROMOTED TO '+tier.name.toUpperCase()+'!';
+  toast.style.display = 'flex';
+  toast.style.flexDirection = 'column';
+  toast.style.alignItems = 'center';
+  // Auto hide after 8s
+  setTimeout(()=>{ toast.style.display='none'; }, 8000);
+}
+
+// ── LOAD LEADERBOARD FROM SUPABASE ──
+async function loadLeaderboard(type='global'){
+  // Update tabs
+  document.querySelectorAll('.lb-tab').forEach(t=>t.classList.remove('active'));
+  const tabEl = document.getElementById('lbt-'+type);
+  if(tabEl) tabEl.classList.add('active');
+
+  const listEl = document.getElementById('lb-list');
+  if(listEl) listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-dim);font-family:sans-serif;font-size:12px">⏳ Loading rankings…</div>';
+
+  // Load my data
+  const myData = getMyPlayerData();
+  updateMyRankCard(myData);
+
+  try{
+    // Fetch top 50 players from Supabase
+    const players = await sbSelect('players',
+      'order=rating.desc&limit=50'
+    );
+
+    if(!players || players.length === 0){
+      if(listEl) listEl.innerHTML = `
+        <div style="text-align:center;padding:30px;color:var(--text-dim);font-family:sans-serif;font-size:12px;line-height:1.8">
+          No ranked players yet!<br>
+          <span style="color:var(--gold)">Play Ranked matches to appear here.</span>
+        </div>`;
+      return;
+    }
+
+    // Find my position
+    const myPos = players.findIndex(p=>p.id===myData.id);
+    const myRankPos = document.getElementById('my-rank-pos');
+    if(myRankPos) myRankPos.textContent = myPos>=0 ? '#'+(myPos+1) : '#—';
+
+    // Render list
+    if(listEl){
+      listEl.innerHTML = players.map((p, idx)=>{
+        const tier    = getRankTier(p.rating||1200);
+        const isMe    = p.id === myData.id;
+        const posClass= idx===0?'top1':idx===1?'top2':idx===2?'top3':'';
+        const posIcon = idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':'';
+        const wl      = p.wins&&p.losses ? `${p.wins}W / ${p.losses}L` : '';
+        return `
+          <div class="lb-row ${isMe?'me':''}">
+            <div class="lb-pos ${posClass}">${posIcon||'#'+(idx+1)}</div>
+            <div class="lb-badge">${tier.emoji}</div>
+            <div class="lb-info">
+              <div class="lb-name">${p.name||'Player'}${isMe?' (You)':''}</div>
+              <div class="lb-rank-name" style="color:${tier.color}">${tier.name.toUpperCase()}</div>
+            </div>
+            <div>
+              <div class="lb-rating">${p.rating||1200}</div>
+              <div class="lb-wl">${wl}</div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+  }catch(e){
+    if(listEl) listEl.innerHTML = `
+      <div style="text-align:center;padding:20px;color:#e74c3c;font-family:sans-serif;font-size:11px">
+        Could not load rankings. Check your connection.
+      </div>`;
+  }
+}
+
+function updateMyRankCard(data){
+  const tier     = getRankTier(data.rating);
+  const progress = getRankProgress(data.rating);
+  const tierIdx  = RANK_TIERS.indexOf(tier);
+  const nextTier = tierIdx > 0 ? RANK_TIERS[tierIdx-1] : null;
+  const ptsToNext= nextTier ? nextTier.min - data.rating : 0;
+
+  // Update card elements
+  const set = (id,val)=>{ const el=document.getElementById(id); if(el)el.textContent=val; };
+  set('my-rank-emoji',     tier.emoji);
+  set('my-rank-tier-name', tier.name.toUpperCase());
+  set('my-rank-player-name', data.name||'Commander');
+  set('my-rank-rating',    data.rating);
+  set('my-rank-wins',      data.wins||0);
+  set('my-rank-losses',    data.losses||0);
+  set('my-rank-draws',     data.draws||0);
+
+  // Color the badge
+  const badge = document.getElementById('my-rank-badge-big');
+  if(badge) badge.style.borderColor = tier.color;
+}
+
+// ── HOOK INTO GAME RESULT ──
+// Call this when a ranked game ends
+async function handleRankedGameEnd(winner, reason){
+  // Only update rating in ranked mode
+  if(window._currentOnlineTab !== 'ranked') return;
+
+  const myColor   = sbPlayerColor;
+  const oppRating = window._sbOpponentRating || 1200;
+  const oppName   = sbOpponentName || 'Opponent';
+
+  let result;
+  if(reason === 'stalemate' || reason === 'draw'){
+    result = 'draw';
+  } else if(
+    (winner==='w' && myColor==='w') ||
+    (winner==='b' && myColor==='b')
+  ){
+    result = 'win';
+  } else {
+    result = 'loss';
+  }
+
+  await updateRankedRating(result, oppRating, oppName);
+}
+
+// Store opponent rating when match is found
+function storeOpponentRating(rating){
+  window._sbOpponentRating = parseInt(rating) || 1200;
+}
+
+// ── INIT PLAYER DATA ON LOAD ──
+function initPlayerRankData(){
+  const data = getMyPlayerData();
+  loadPlayerProfile();
+  // Sync to Supabase if we have games
+  if(data.games > 0) syncPlayerToSupabase(data).catch(()=>{});
+}
+
+
+
+/* ══ DRAW CONDITION DETECTION ══ */
+function isInsufficientMaterial(){
+  const pieces=[];
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++)if(board[r][c])pieces.push(board[r][c]);
+  const w=pieces.filter(p=>p.color==='w');
+  const b=pieces.filter(p=>p.color==='b');
+  const onlyK=a=>a.length===1&&a[0].type==='K';
+  const kAndB=a=>a.length===2&&a.some(p=>p.type==='K')&&a.some(p=>p.type==='B');
+  const kAndN=a=>a.length===2&&a.some(p=>p.type==='K')&&a.some(p=>p.type==='N');
+  if(onlyK(w)&&onlyK(b))return true;
+  if(kAndB(w)&&onlyK(b))return true;
+  if(onlyK(w)&&kAndB(b))return true;
+  if(kAndN(w)&&onlyK(b))return true;
+  if(onlyK(w)&&kAndN(b))return true;
+  if(kAndB(w)&&kAndB(b)){
+    let wp=null,bp=null;
+    for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+      if(board[r][c]&&board[r][c].color==='w'&&board[r][c].type==='B')wp={r,c};
+      if(board[r][c]&&board[r][c].color==='b'&&board[r][c].type==='B')bp={r,c};
+    }
+    if(wp&&bp&&(wp.r+wp.c)%2===(bp.r+bp.c)%2)return true;
+  }
+  return false;
+}
+let halfMoveClock=0;
+function updateHalfMoveClock(piece,captured){
+  if(captured||piece.type==='P')halfMoveClock=0;
+  else halfMoveClock++;
+}
+function isFiftyMoveRule(){ return halfMoveClock>=100; }
+const positionHistory=[];
+function getBoardHash(){
+  let h=turn;
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){const p=board[r][c];h+=p?p.type+p.color:'.';}
+  h+=(castlingRights.wK?'1':'0')+(castlingRights.wQ?'1':'0')+(castlingRights.bK?'1':'0')+(castlingRights.bQ?'1':'0');
+  return h;
+}
+function recordPosition(){
+  const h=getBoardHash();positionHistory.push(h);
+  return positionHistory.filter(x=>x===h).length>=3;
+}
+function isThreefoldRepetition(){
+  const h=getBoardHash();
+  return positionHistory.filter(x=>x===h).length>=3;
+}
+function resetDrawTrackers(){
+  halfMoveClock=0;positionHistory.length=0;
+}
+
+
+/* ══ PLAYER PROFILE — Name + Country Flag ══ */
+const COUNTRIES = [
+  {code:'ae',flag:'🇦🇪',name:'UAE'},
+  {code:'us',flag:'🇺🇸',name:'USA'},
+  {code:'gb',flag:'🇬🇧',name:'UK'},
+  {code:'in',flag:'🇮🇳',name:'India'},
+  {code:'pk',flag:'🇵🇰',name:'Pakistan'},
+  {code:'sa',flag:'🇸🇦',name:'Saudi Arabia'},
+  {code:'eg',flag:'🇪🇬',name:'Egypt'},
+  {code:'ng',flag:'🇳🇬',name:'Nigeria'},
+  {code:'de',flag:'🇩🇪',name:'Germany'},
+  {code:'fr',flag:'🇫🇷',name:'France'},
+  {code:'es',flag:'🇪🇸',name:'Spain'},
+  {code:'it',flag:'🇮🇹',name:'Italy'},
+  {code:'br',flag:'🇧🇷',name:'Brazil'},
+  {code:'mx',flag:'🇲🇽',name:'Mexico'},
+  {code:'ca',flag:'🇨🇦',name:'Canada'},
+  {code:'au',flag:'🇦🇺',name:'Australia'},
+  {code:'ru',flag:'🇷🇺',name:'Russia'},
+  {code:'cn',flag:'🇨🇳',name:'China'},
+  {code:'jp',flag:'🇯🇵',name:'Japan'},
+  {code:'kr',flag:'🇰🇷',name:'South Korea'},
+  {code:'tr',flag:'🇹🇷',name:'Turkey'},
+  {code:'ir',flag:'🇮🇷',name:'Iran'},
+  {code:'iq',flag:'🇮🇶',name:'Iraq'},
+  {code:'jo',flag:'🇯🇴',name:'Jordan'},
+  {code:'kw',flag:'🇰🇼',name:'Kuwait'},
+  {code:'qa',flag:'🇶🇦',name:'Qatar'},
+  {code:'om',flag:'🇴🇲',name:'Oman'},
+  {code:'bh',flag:'🇧🇭',name:'Bahrain'},
+  {code:'lb',flag:'🇱🇧',name:'Lebanon'},
+  {code:'sy',flag:'🇸🇾',name:'Syria'},
+  {code:'ma',flag:'🇲🇦',name:'Morocco'},
+  {code:'dz',flag:'🇩🇿',name:'Algeria'},
+  {code:'tn',flag:'🇹🇳',name:'Tunisia'},
+  {code:'za',flag:'🇿🇦',name:'South Africa'},
+  {code:'ke',flag:'🇰🇪',name:'Kenya'},
+  {code:'gh',flag:'🇬🇭',name:'Ghana'},
+  {code:'et',flag:'🇪🇹',name:'Ethiopia'},
+  {code:'id',flag:'🇮🇩',name:'Indonesia'},
+  {code:'my',flag:'🇲🇾',name:'Malaysia'},
+  {code:'ph',flag:'🇵🇭',name:'Philippines'},
+  {code:'th',flag:'🇹🇭',name:'Thailand'},
+  {code:'vn',flag:'🇻🇳',name:'Vietnam'},
+  {code:'bd',flag:'🇧🇩',name:'Bangladesh'},
+  {code:'lk',flag:'🇱🇰',name:'Sri Lanka'},
+  {code:'np',flag:'🇳🇵',name:'Nepal'},
+  {code:'ar',flag:'🇦🇷',name:'Argentina'},
+  {code:'co',flag:'🇨🇴',name:'Colombia'},
+  {code:'cl',flag:'🇨🇱',name:'Chile'},
+  {code:'pe',flag:'🇵🇪',name:'Peru'},
+  {code:'nl',flag:'🇳🇱',name:'Netherlands'},
+  {code:'be',flag:'🇧🇪',name:'Belgium'},
+  {code:'se',flag:'🇸🇪',name:'Sweden'},
+  {code:'no',flag:'🇳🇴',name:'Norway'},
+  {code:'dk',flag:'🇩🇰',name:'Denmark'},
+  {code:'fi',flag:'🇫🇮',name:'Finland'},
+  {code:'pl',flag:'🇵🇱',name:'Poland'},
+  {code:'pt',flag:'🇵🇹',name:'Portugal'},
+  {code:'gr',flag:'🇬🇷',name:'Greece'},
+  {code:'ro',flag:'🇷🇴',name:'Romania'},
+  {code:'ua',flag:'🇺🇦',name:'Ukraine'},
+  {code:'ng',flag:'🇳🇬',name:'Nigeria'},
+];
+
+// Build country dropdown
+function buildCountrySelect(){
+  const sel = document.getElementById('player-country');
+  if(!sel) return;
+  sel.innerHTML = COUNTRIES.map(c=>
+    `<option value="${c.code}">${c.flag} ${c.name}</option>`
+  ).join('');
+}
+
+// Save player profile to localStorage
+function savePlayerProfile(){
+  const name    = document.getElementById('player-display-name')?.value?.trim() || 'Commander';
+  const country = document.getElementById('player-country')?.value || 'ae';
+  const data    = getMyPlayerData();
+  data.name    = name;
+  data.country = country;
+  saveMyPlayerData(data);
+  // Update avatar flag
+  updateAvatarFlag(country);
+  // Update rank emoji
+  const t = getRankTier(data.rating);
+  const re = document.getElementById('player-rank-emoji');
+  if(re) re.textContent = t.emoji;
+}
+
+function updateAvatarFlag(countryCode){
+  const country = COUNTRIES.find(c=>c.code===countryCode);
+  const avatar  = document.getElementById('player-avatar-flag');
+  if(avatar && country) avatar.textContent = country.flag;
+}
+
+function getPlayerFlag(){
+  const data = getMyPlayerData();
+  const c = COUNTRIES.find(c=>c.code===(data.country||'ae'));
+  return c ? c.flag : '🌍';
+}
+
+// Load profile into UI
+function loadPlayerProfile(){
+  const data = getMyPlayerData();
+  const nameEl = document.getElementById('player-display-name');
+  if(nameEl && data.name) nameEl.value = data.name;
+  buildCountrySelect();
+  // Set saved country
+  const sel = document.getElementById('player-country');
+  if(sel && data.country) sel.value = data.country;
+  updateAvatarFlag(data.country || 'ae');
+  // Set rating
+  const ratingEl = document.getElementById('player-rating');
+  if(ratingEl) ratingEl.textContent = data.rating || 1200;
+  // Set rank emoji
+  const t = getRankTier(data.rating || 1200);
+  const re = document.getElementById('player-rank-emoji');
+  if(re) re.textContent = t.emoji;
+}
+
+
+
+/* ══ SHOP FUNCTIONS ══ */
+
+// Coming soon toast
+function showComingSoon(){
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    background:linear-gradient(135deg,#1c1006,#2a1808);
+    border:2px solid var(--gold);border-radius:8px;
+    padding:24px 32px;text-align:center;z-index:9999;
+    min-width:260px;animation:mIn 0.3s ease;
+  `;
+  toast.innerHTML = `
+    <div style="font-size:36px;margin-bottom:10px">🚀</div>
+    <div style="font-size:14px;color:var(--gold-light);font-family:Cinzel,serif;letter-spacing:2px;font-weight:700">COMING SOON</div>
+    <div style="font-size:11px;color:var(--text-dim);margin-top:8px;line-height:1.6">
+      Full payments will be available<br>when ChessX launches on Google Play
+    </div>
+    <div style="font-size:10px;color:var(--gold);margin-top:10px;letter-spacing:2px">FREE DURING BETA ✓</div>
+    <button onclick="this.parentNode.remove()" style="margin-top:14px;padding:8px 20px;background:rgba(201,168,76,0.15);border:1px solid var(--gold);border-radius:4px;color:var(--gold);font-family:Cinzel,serif;font-size:10px;letter-spacing:2px;cursor:pointer">OK</button>
+  `;
+  document.body.appendChild(toast);
+  setTimeout(()=>{ if(toast.parentNode) toast.remove(); }, 4000);
+}
+
+// Preview theme from shop
+function previewTheme(theme){
+  applyBoardTheme(theme);
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position:fixed;bottom:100px;left:50%;transform:translateX(-50%);
+    background:rgba(0,0,0,0.85);border:1px solid var(--gold);
+    border-radius:6px;padding:10px 18px;z-index:9999;
+    font-size:11px;color:var(--gold-light);letter-spacing:2px;
+    font-family:Cinzel,serif;text-align:center;
+  `;
+  toast.textContent = '✓ ' + theme.toUpperCase() + ' THEME APPLIED';
+  document.body.appendChild(toast);
+  setTimeout(()=>{ if(toast.parentNode) toast.remove(); }, 2000);
+}
+
+
+
+/* ══ IN-GAME CHAT ══ */
+let gameChatOpen = false;
+let gameChatUnread = 0;
+
+function toggleGameChat(){
+  gameChatOpen = !gameChatOpen;
+  const panel = document.getElementById('game-chat-panel');
+  if(panel) panel.style.display = gameChatOpen ? 'block' : 'none';
+  if(gameChatOpen){
+    gameChatUnread = 0;
+    updateChatBadge();
+    // Scroll to bottom
+    const log = document.getElementById('game-chat-log');
+    if(log) log.scrollTop = log.scrollHeight;
+  }
+}
+
+function showGameChatBtn(){
+  const btn = document.getElementById('chat-toggle-btn');
+  if(btn) btn.style.display = 'inline-flex';
+}
+
+function hideGameChatBtn(){
+  const btn = document.getElementById('chat-toggle-btn');
+  if(btn) btn.style.display = 'none';
+  const panel = document.getElementById('game-chat-panel');
+  if(panel) panel.style.display = 'none';
+  gameChatOpen = false;
+}
+
+function addGameChatMsg(msg, type='opponent'){
+  const log = document.getElementById('game-chat-log');
+  if(!log) return;
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + type;
+  div.textContent = msg;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  // Show unread badge if chat is closed
+  if(!gameChatOpen && type === 'opponent'){
+    gameChatUnread++;
+    updateChatBadge();
+  }
+}
+
+function updateChatBadge(){
+  const btn = document.getElementById('chat-toggle-btn');
+  if(!btn) return;
+  if(gameChatUnread > 0){
+    btn.textContent = '💬 CHAT (' + gameChatUnread + ')';
+    btn.style.color = '#e74c3c';
+    btn.style.borderColor = '#e74c3c';
+  } else {
+    btn.textContent = '💬 CHAT';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  }
+}
+
+function sendGameChat(){
+  const inp = document.getElementById('game-chat-input');
+  const msg = (inp?.value || '').trim();
+  if(!msg) return;
+  inp.value = '';
+  addGameChatMsg(getPlayerFlag() + ' You: ' + msg, 'you');
+  // Send via Supabase realtime
+  if(gameMode === 'supabase' && realtimeWS?.readyState === 1){
+    realtimeWS.sbSend('chat', {player: sbPlayerId, msg});
+  }
+}
+
+function sendGameQuickReply(msg){
+  const inp = document.getElementById('game-chat-input');
+  if(inp) inp.value = msg;
+  sendGameChat();
+}
+
+
 /* ── INIT ── */
 ['click','touchstart','keydown'].forEach(ev=>{
   document.addEventListener(ev,()=>AUD.unlock(),{once:true,passive:true});
@@ -2772,6 +4512,7 @@ window.addEventListener('load',()=>{
   applyBoardTheme();
   buildSwatches();
   initNexoraSplash();
+  initPlayerRankData();
 });
 
 </script>
