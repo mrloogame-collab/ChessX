@@ -1440,13 +1440,10 @@ function initAds(){setTimeout(showBannerAd,2500);}
 
 /* ── ONLINE AI HUMAN ── */
 /* ── ONLINE MODE ENGINE ── */
-function startMatchmaking(){AIH.start();}
-function quickReply(msg){AIH.sendChat(msg);}
-function sendChat(){
-  const inp=document.getElementById('chat-input');
-  if(inp&&inp.value.trim()){AIH.sendChat(inp.value.trim());inp.value='';}
-}
-function cancelMatchmaking(){AIH.cancel();showScreen('title-screen');}
+
+
+
+
 
 function setOnlineTab(tab){
   // Cancel any active search when switching tabs
@@ -2224,7 +2221,7 @@ function handleClick(r,c){
     const mv=legalMoves.find(m=>m.r===r&&m.c===c);
     if(mv){
       // Extra guard: confirm the piece being moved belongs to you
-      if((gameMode==='supabase'||gameMode==='p2p')&&board[selected.r][selected.c]&&board[selected.r][selected.c].color!==sbPlayerColor){
+      if(gameMode==='supabase'&&board[selected.r][selected.c]&&board[selected.r][selected.c].color!==sbPlayerColor){
         selected=null;legalMoves=[];renderBoard();return;
       }
       executeMove(selected.r,selected.c,r,c,mv);
@@ -2266,9 +2263,6 @@ function executeMove(fr,fc,tr,tc,mv){
   if(gameMode==='p2p'&&!arguments[5])sendP2PMove({fr,fc,r:tr,c:tc,...mv});
   // Send move to online opponent (Supabase)
   if(gameMode==='supabase' && !arguments[5]){
-    // Final server-side guard: only send if this is your piece
-    const movingPiece = board[fr] && board[fr][fc];
-    if(movingPiece && movingPiece.color !== sbPlayerColor) return;
     sendOnlineMove({fr,fc,r:tr,c:tc,...mv});
   }
   // Trigger AI for single/conquest modes
@@ -2493,13 +2487,16 @@ function updateStatus(){
     return;
   }
 
-  // Single player / local
+  // Single player / local / conquest
   const statusEl2 = document.getElementById('status-text');
   if(gameMode==='single'&&turn==='b'){
     statusEl2.textContent = '🤖 AI THINKING…';
     statusEl2.style.color = '#e74c3c';
+  } else if(gameMode==='local'){
+    statusEl2.textContent = (turn==='w'?'⬜ PLAYER 1 TURN':'⬛ PLAYER 2 TURN')+(ic?' ☠ CHECK!':'');
+    statusEl2.style.color = turn==='w'?'#f0d080':'#a0c0f0';
   } else {
-    statusEl2.textContent = (turn==='w'?'⚔ YOUR TURN':'🛡 BLACK\'S TURN')+(ic?' ☠ CHECK!':'');
+    statusEl2.textContent = (turn==='w'?'⚔ WHITE TURN':'🛡 BLACK TURN')+(ic?' ☠ CHECK!':'');
     statusEl2.style.color = turn==='w'?'#f0d080':'';
   }
 }
@@ -2916,11 +2913,7 @@ function applyMove(mv){
     board[enPassantTarget.pawnR][enPassantTarget.pawnC]=null;
   return{snap,sep,scr};
 }
-function undoMove(saved){
-  restoreBoard(saved.snap);
-  enPassantTarget=saved.sep;
-  castlingRights=saved.scr;
-}
+function aiUndoMove(saved){restoreBoard(saved.snap);enPassantTarget=saved.sep;castlingRights=saved.scr;}
 
 /* ══════════════════════════════════════════════
    REAL P2P MULTIPLAYER via PeerJS
@@ -3186,34 +3179,27 @@ async function startRealMatchmaking(){
     // Delete any old waiting rooms this player left behind
     await sbDelete('chess_rooms', 'host_id=eq.'+sbPlayerId+'&status=eq.waiting').catch(()=>{});
 
-    // ── STEP 2: Try to join an existing waiting room ──
-    // Use a retry loop to handle race conditions with multiple players
+    // ── STEP 2: Wait briefly then try to join existing room ──
+    // Small delay lets host insert room before guest searches
+    await new Promise(res=>setTimeout(res, 800));
     let joined = false;
     let attempts = 0;
 
     while(!joined && attempts < 3){
       attempts++;
 
-      // Get oldest waiting room (not hosted by us)
-      const matchMode = window._currentOnlineTab || 'quick';
-      // Match players in same mode (quick vs ranked)
-      // Also accept null/undefined mode for backward compatibility
+      // Get ALL waiting rooms — no mode filter to maximize connection chance
       const open = await sbSelect('chess_rooms',
-        'status=eq.waiting&order=created_at.asc&limit=10'
-      );
-      // Filter by mode client-side for flexibility
-      const modeFiltered = (open||[]).filter(r=>
-        !r.mode || r.mode===matchMode || r.mode==='quick'
+        'status=eq.waiting&order=created_at.asc&limit=20'
       );
 
-      if(!modeFiltered || modeFiltered.length === 0) break; // no rooms available → become host
+      if(!open || open.length === 0) break; // no rooms → become host
 
-      // Filter out our own rooms — using modeFiltered as 'open' and very old rooms (>2 min = stale)
+      // Filter out own rooms and very old rooms (>5 min stale)
       const now = Date.now();
-      const validRooms = modeFiltered.filter(r =>
+      const validRooms = (open||[]).filter(r =>
         r.host_id !== sbPlayerId &&
-        r.id !== sbRoomId && // not a room we already tried
-        (now - new Date(r.created_at).getTime()) < 120000 // less than 2 min old
+        (now - new Date(r.created_at).getTime()) < 300000 // less than 5 min old
       );
 
       if(validRooms.length === 0) break;
@@ -3232,8 +3218,9 @@ async function startRealMatchmaking(){
             }
           );
 
-          // Check if update succeeded (result has our data)
-          if(result && result.length > 0 && result[0].guest_id === sbPlayerId){
+          // Check if update succeeded
+          // Supabase returns updated rows — if we got data back, we claimed it
+          if(result && result.length > 0){
             // Successfully joined!
             sbRoomId       = room.id;
             sbPlayerColor  = 'b';
@@ -3597,25 +3584,7 @@ function sendChat(){
 function quickReply(msg){ document.getElementById('chat-input').value=msg; sendChat(); }
 
 // ── Online tab switcher ──
-function setOnlineTab(tab){
-  document.querySelectorAll('.om-tab').forEach(t=>t.classList.remove('active'));
-  const el=document.getElementById('tab-'+tab); if(el)el.classList.add('active');
-  const fs=document.getElementById('friend-code-section');
-  if(tab==='friend'){
-    if(fs)fs.style.display='block';
-    startFriendRoom();
-    setMMWrap('<p style="font-size:10px;color:var(--text-dim);font-family:sans-serif;text-align:center">Share the code above with your friend, or enter theirs to join.</p>');
-  } else {
-    if(fs)fs.style.display='none';
-    const msgs={
-      quick:'Real online multiplayer — find a live opponent instantly worldwide.',
-      ranked:'Ranked match — your rating changes based on result.'
-    };
-    const content=document.getElementById('online-tab-content');
-    if(content)content.innerHTML='<p style="font-size:10px;color:var(--text-dim);margin-bottom:14px;font-family:sans-serif;text-align:center;line-height:1.6">'+msgs[tab]+'</p>';
-    resetMMWrap();
-  }
-}
+// Old setOnlineTab removed
 
 // Legacy wrappers (keep old function names working)
 function startMatchmaking(){ startRealMatchmaking(); }
