@@ -2169,6 +2169,9 @@ function startGame(mode,diff){
   else if(mode==='local'){
     document.getElementById('p1-name').textContent='⬜ PLAYER 1';
     document.getElementById('p2-name').textContent='⬛ PLAYER 2';
+    // Store local player labels for dynamic swapping
+    window._localP1Label='⬜ PLAYER 1';
+    window._localP2Label='⬛ PLAYER 2';
   }
   else if(mode==='online'){document.getElementById('p1-name').textContent='YOUR ARMY';document.getElementById('p2-name').textContent=AIH.getName().toUpperCase();}
   else{document.getElementById('p1-name').textContent='YOUR ARMY';document.getElementById('p2-name').textContent='OPPONENT';}
@@ -2183,11 +2186,38 @@ function showNextDialog(){if(dialogIdx>=dialogQueue.length){hideDialog();return;
 function nextDialog(){dialogIdx++;if(dialogIdx>=dialogQueue.length){hideDialog();startTimer();return;}const d=dialogQueue[dialogIdx];document.getElementById('dlg-speaker').textContent=d.sp;document.getElementById('dlg-text').textContent=d.tx;}
 function hideDialog(){document.getElementById('story-dlg').classList.remove('show');}
 function startTimer(){clearInterval(timerInterval);timerInterval=setInterval(()=>{timers[turn]--;updateTimerDisplay();if(timers[turn]<=0){clearInterval(timerInterval);showResult(turn==='w'?'b':'w','timeout');}},1000);}
-function updateTimerDisplay(){['w','b'].forEach(c=>{const t=timers[c],m=Math.floor(t/60),s=t%60,el=document.getElementById(c==='w'?'p1-timer':'p2-timer');el.textContent=`${m}:${s.toString().padStart(2,'0')}`;el.classList.toggle('urgent',t<=30);});}
+function updateTimerDisplay(){
+  // Determine which timer goes on which panel
+  // p2 = TOP panel (opponent), p1 = BOTTOM panel (current player)
+  let bottomColor, topColor;
+  if(gameMode==='local'){
+    // In local hotseat, current player is always bottom
+    bottomColor = turn;
+    topColor    = turn==='w'?'b':'w';
+  } else if(gameMode==='supabase'){
+    // In online, your color is always bottom
+    bottomColor = sbPlayerColor||'w';
+    topColor    = sbPlayerColor==='w'?'b':'w';
+  } else {
+    // Single player / default: white always bottom
+    bottomColor = 'w';
+    topColor    = 'b';
+  }
+  // Bottom panel = p1, Top panel = p2
+  const bt=timers[bottomColor],bm=Math.floor(bt/60),bs=bt%60;
+  const tt=timers[topColor],   tm=Math.floor(tt/60),ts=tt%60;
+  const p1El=document.getElementById('p1-timer');
+  const p2El=document.getElementById('p2-timer');
+  if(p1El){p1El.textContent=`${bm}:${bs.toString().padStart(2,'0')}`;p1El.classList.toggle('urgent',bt<=30);}
+  if(p2El){p2El.textContent=`${tm}:${ts.toString().padStart(2,'0')}`;p2El.classList.toggle('urgent',tt<=30);}
+}
 function renderBoard(){
   const bd=document.getElementById('board');bd.innerHTML='';
-  // BUG1 FIX: Flip board coordinates for black player
-  const flipped = window.sbBoardFlipped === true;
+  // Board flip logic:
+  // Online: flip for black player (sbBoardFlipped set in startOnlineGame)
+  // Local hotseat: flip when it's black's turn so current player sees their pieces at bottom
+  const flipped = window.sbBoardFlipped === true ||
+                  (gameMode==='local' && turn==='b');
   const rowLabels = flipped ? '12345678' : '87654321';
   const colLabels = flipped ? 'hgfedcba' : 'abcdefgh';
   document.getElementById('coord-r').innerHTML=rowLabels.split('').map(n=>`<span>${n}</span>`).join('');
@@ -2209,41 +2239,42 @@ const kId=gameMode==='conquest'&&piece.color==='b'&&activeConquestKingdom?active
 }
 function updateCaptured(){const pc={P:'♟',R:'♜',N:'♞',B:'♝',Q:'♛',K:'♚'};document.getElementById('p1-caps').textContent=capturedB.map(p=>pc[p]||p).join('');document.getElementById('p2-caps').textContent=capturedW.map(p=>pc[p]||p).join('');}
 function handleClick(r,c){
-  // BLOCK: In online mode, only act on YOUR turn
+  // Online mode: block if not your turn
   if(gameMode==='supabase' && turn!==sbPlayerColor) return;
 
   const piece=board[r][c];
 
-  // If a piece is already selected
   if(selected){
-    // Try to move to clicked square
     const mv=legalMoves.find(m=>m.r===r&&m.c===c);
     if(mv){
-      // Online: double-check we're moving our own piece
+      // Online: verify moving own piece
       if(gameMode==='supabase'){
-        const movingPiece=board[selected.r][selected.c];
-        if(!movingPiece||movingPiece.color!==sbPlayerColor){
+        const mp=board[selected.r][selected.c];
+        if(!mp||mp.color!==sbPlayerColor){
+          selected=null;legalMoves=[];renderBoard();return;
+        }
+      }
+      // Local hotseat: verify moving current turn's piece
+      if(gameMode==='local'){
+        const mp=board[selected.r][selected.c];
+        if(!mp||mp.color!==turn){
           selected=null;legalMoves=[];renderBoard();return;
         }
       }
       executeMove(selected.r,selected.c,r,c,mv);
       return;
     }
-    // Clicked a piece of same turn color — reselect
     if(piece&&piece.color===turn){
-      // Online: can only select your own color
       if(gameMode==='supabase'&&piece.color!==sbPlayerColor){
         selected=null;legalMoves=[];renderBoard();return;
       }
       selected={r,c};legalMoves=getLegalMoves(r,c);renderBoard();return;
     }
-    // Clicked empty or wrong color — deselect
     selected=null;legalMoves=[];renderBoard();return;
   }
 
-  // Nothing selected yet — select a piece
+  // Select piece — only current turn's color
   if(piece&&piece.color===turn){
-    // Online: can only select your own color pieces
     if(gameMode==='supabase'&&piece.color!==sbPlayerColor) return;
     selected={r,c};legalMoves=getLegalMoves(r,c);renderBoard();
   }
@@ -2497,6 +2528,18 @@ function updateStatus(){
     statusEl2.textContent = '🤖 AI THINKING…';
     statusEl2.style.color = '#e74c3c';
   } else if(gameMode==='local'){
+    // Swap name panels so current player is always at bottom
+    const p1El=document.getElementById('p1-name');
+    const p2El=document.getElementById('p2-name');
+    if(p1El&&p2El){
+      if(turn==='w'){
+        p1El.textContent='⬜ PLAYER 1 (Your turn)';
+        p2El.textContent='⬛ PLAYER 2';
+      } else {
+        p1El.textContent='⬛ PLAYER 2 (Your turn)';
+        p2El.textContent='⬜ PLAYER 1';
+      }
+    }
     statusEl2.textContent = (turn==='w'?'⬜ PLAYER 1 TURN':'⬛ PLAYER 2 TURN')+(ic?' ☠ CHECK!':'');
     statusEl2.style.color = turn==='w'?'#f0d080':'#a0c0f0';
   } else {
