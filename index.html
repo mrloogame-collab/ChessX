@@ -2499,17 +2499,13 @@ function showResult(winner,reason){
   if(gameMode==='supabase' && window._currentOnlineTab==='ranked'){
     handleRankedGameEnd(winner, reason).catch(()=>{});
   }
-  const icons={checkmate:'🏆',stalemate:'🤝',timeout:'⏰',resign:'🏳️'},titles={checkmate:winner==='w'?'WHITE WINS!':'BLACK WINS!',stalemate:'STALEMATE',timeout:"TIME'S UP!",resign:'GAME OVER'},descs={
+  const icons={checkmate:'🏆',stalemate:'🤝',timeout:'⏰',resign:'🏳️'},titles={checkmate:winner==='w'?'WHITE WINS!':'BLACK WINS!',stalemate:'STALEMATE',timeout:"TIME'S UP!",resign: (gameMode==='p2p'||gameMode==='supabase') ? (window._iResigned?'DEFEATED':'VICTORY!') : 'GAME OVER'},descs={
     checkmate:`${winner==='w'?'White':'Black'} Army conquered the throne!`,
     stalemate:'No legal moves — stalemate! An honorable draw.',
     timeout:`${winner==='w'?'White':'Black'} Army wins! Time expired.`,
-    resign: (()=>{
-      const myColor=window.sbPlayerColor||p2pColor||(turn==='w'?'b':'w');
-      if(gameMode==='p2p'||gameMode==='supabase'){
-        return winner===myColor ? '🏆 Opponent surrendered — YOU WIN!' : '🏳️ You surrendered — You Lose.';
-      }
-      return winner===turn?'Your army has surrendered.':'Enemy surrendered — You Win!';
-    })(),
+    resign: (gameMode==='p2p'||gameMode==='supabase') ?
+      (window._iResigned ? '🏳️ You surrendered. Better luck next time!' : '🏆 Opponent surrendered — YOU WIN!') :
+      'An army has surrendered.',
     insufficient:'Only kings remain — insufficient material to checkmate. Draw!',
     fiftymove:'50 moves without a capture or pawn move. Draw by fifty-move rule!',
     threefold:'Same position repeated 3 times. Draw by repetition!'
@@ -2530,14 +2526,20 @@ function doResign(){
   closeModal('resign-modal');
   clearInterval(timerInterval);
   AUD.stopTheme();
-  // In P2P: send resign signal to opponent THEN show lose screen
-  if(gameMode==='p2p' && p2pWS && p2pWS.readyState===1){
-    p2pWS.sbSend('p2p_resign',{player:p2pPlayerId});
-    // I resigned = I lose = opponent wins
-    // Show MY lose screen
-    showResult(p2pColor==='w'?'b':'w','resign'); // opponent color = winner
+  if(gameMode==='p2p'){
+    // Send resign to opponent via realtime
+    if(p2pWS && p2pWS.readyState===1){
+      p2pWS.sbSend('p2p_resign',{player:p2pPlayerId});
+    }
+    // Also mark in DB as fallback
+    if(p2pRoomId){
+      sbUpdate('chess_rooms','id=eq.'+p2pRoomId,{status:'resigned',last_move:'RESIGN_'+p2pPlayerId}).catch(()=>{});
+    }
+    // I resigned = I lose
+    // window._iResigned = true means show lose screen
+    window._iResigned = true;
+    showResult(p2pColor==='w'?'b':'w','resign');
   } else {
-    // Local/AI: current player resigns = other side wins
     showResult(turn==='w'?'b':'w','resign');
   }
 }
@@ -3113,7 +3115,8 @@ function onP2PEvent(event, payload){
     // Opponent resigned — I win!
     clearInterval(timerInterval);
     AUD.stopTheme();
-    showResult(p2pColor,'resign'); // p2pColor = my color = winner
+    window._iResigned = false; // opponent resigned not me
+    showResult(p2pColor,'resign');
   }
 }
 
@@ -3170,15 +3173,26 @@ function startP2PGame(){
     try{
       const rows = await sbSelect('chess_rooms','id=eq.'+p2pRoomId);
       if(!rows||rows.length===0){
-        // Room deleted — opponent left
         clearInterval(window._p2pRoomCheck);
         if(p2pReady){
           p2pReady=false;
+          clearInterval(timerInterval);AUD.stopTheme();
+          window._iResigned=false;
+          showResult(p2pColor,'resign');
+        }
+      } else if(rows[0]&&rows[0].status==='resigned'&&rows[0].last_move&&rows[0].last_move.startsWith('RESIGN_')){
+        // Opponent resigned via DB fallback
+        const resignedId = rows[0].last_move.replace('RESIGN_','');
+        if(resignedId!==p2pPlayerId && p2pReady){
+          clearInterval(window._p2pRoomCheck);
+          p2pReady=false;
+          clearInterval(timerInterval);AUD.stopTheme();
+          window._iResigned=false;
           showResult(p2pColor,'resign');
         }
       }
     }catch(e){}
-  }, 20000);
+  }, 5000);
 }
 
 // ── Cleanup ──
