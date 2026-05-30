@@ -4131,12 +4131,13 @@ async function startRealMatchmaking(){
           ws.close();
           storeOpponentRating(data.rating||1200);
           showMMFound(sbOpponentName,data.rating||1200,sbPlayerColor);
-          setTimeout(()=>{
-            if(sbIsSearching){
-              connectRealtime(sbRoomId);
-              startOnlineGame(sbPlayerColor,sbOpponentName);
-            }
-          },1500);
+          // Connect realtime first, then start game after WS is ready
+  connectRealtime(sbRoomId);
+  setTimeout(()=>{
+    if(sbIsSearching){
+      startOnlineGame(sbPlayerColor,sbOpponentName);
+    }
+  },2000);
         }
 
         if(evt==='matched'&&data.to===sbPlayerId){
@@ -4153,12 +4154,13 @@ async function startRealMatchmaking(){
           ws.close();
           storeOpponentRating(data.fromRating||1200);
           showMMFound(sbOpponentName,data.fromRating||1200,sbPlayerColor);
-          setTimeout(()=>{
-            if(sbIsSearching){
-              connectRealtime(sbRoomId);
-              startOnlineGame(sbPlayerColor,sbOpponentName);
-            }
-          },1500);
+          // Connect realtime first, then start game after WS is ready
+  connectRealtime(sbRoomId);
+  setTimeout(()=>{
+    if(sbIsSearching){
+      startOnlineGame(sbPlayerColor,sbOpponentName);
+    }
+  },2000);
         }
       }catch(err){}
     };
@@ -4226,6 +4228,7 @@ function startOnlineGame(myColor,opponentName){
   document.getElementById('p2-name').textContent=oppLabel;
   window.sbBoardFlipped=(myColor==='b');
   sbPlayerColor=myColor;
+  window.sbPlayerColor=myColor; // CRITICAL: set window copy for move guard
   gameMode='supabase';
   initBoard();clearInterval(timerInterval);timers={w:600,b:600};
   showScreen('game-screen');renderBoard();updateStatus();
@@ -4238,9 +4241,13 @@ function startOnlineGame(myColor,opponentName){
 }
 
 function sendOnlineMove(mv){
-  if(gameMode!=='supabase'||!realtimeWS||realtimeWS.readyState!==1)return;
+  if(gameMode!=='supabase'||!realtimeWS)return;
+  // Retry if WebSocket not ready yet
+  if(realtimeWS.readyState!==1){
+    setTimeout(()=>sendOnlineMove(mv),300);
+    return;
+  }
   realtimeWS.sbSend('move',{player:sbPlayerId,move:mv});
-  sbUpdate('chess_rooms','id=eq.'+sbRoomId,{last_move:JSON.stringify(mv),current_turn:turn}).catch(()=>{});
 }
 
 /* ══ SUPABASE REALTIME ══ */
