@@ -2350,9 +2350,8 @@ function executeMove(fr,fc,tr,tc,mv){
   }
   turn=turn==='w'?'b':'w';selected=null;legalMoves=[];renderBoard();updateStatus();
   if(gameMode==='p2p'&&!arguments[5]){
-    // Only send if it's our piece
-    if(board[fr]&&board[fr][fc]&&board[fr][fc].color===window.sbPlayerColor)
-      sendP2PMove({fr,fc,r:tr,c:tc,...mv});
+    // 'piece' is captured before board changes so color check is reliable
+    sendP2PMove({fr,fc,r:tr,c:tc,...mv});
   }
   // Send move to online opponent (Supabase)
   if(gameMode==='supabase' && !arguments[5]){
@@ -4051,12 +4050,35 @@ function sbRealtime(roomId,onEvent){
     hb=setInterval(()=>{if(ws.readyState===1)ws.send(JSON.stringify({topic:'phoenix',event:'heartbeat',payload:{},ref:'hb'}));},20000);
   };
   ws.onmessage=(e)=>{
-    try{const msg=JSON.parse(e.data);if(msg.event==='broadcast'&&msg.payload)onEvent(msg.payload.event,msg.payload.payload);}catch(err){}
+    try{
+      const msg=JSON.parse(e.data);
+      // Handle Supabase realtime broadcast format
+      if(msg.event==='broadcast'&&msg.payload){
+        // Format: payload.event + payload.payload
+        if(msg.payload.event&&msg.payload.payload!==undefined){
+          onEvent(msg.payload.event, msg.payload.payload);
+        }
+        // Alternative format: payload.type='broadcast'
+        else if(msg.payload.type==='broadcast'&&msg.payload.event){
+          onEvent(msg.payload.event, msg.payload.payload);
+        }
+      }
+      // Handle phx_reply (join confirmation)
+      if(msg.event==='phx_reply'&&msg.payload&&msg.payload.status==='ok'){
+        console.log('Realtime channel joined: '+msg.topic);
+      }
+    }catch(err){}
   };
   ws.onclose=()=>{clearInterval(hb);};
   ws.sbSend=(event,payload)=>{
     if(ws.readyState!==1)return;
-    ws.send(JSON.stringify({topic:'realtime:chessx_room_'+roomId,event:'broadcast',payload:{event,payload},ref:Date.now().toString()}));
+    // Supabase realtime broadcast format
+    ws.send(JSON.stringify({
+      topic:'realtime:chessx_room_'+roomId,
+      event:'broadcast',
+      payload:{type:'broadcast',event,payload},
+      ref:Date.now().toString()
+    }));
   };
   return ws;
 }
