@@ -1465,7 +1465,7 @@ function showScreen(id){
 }
 function closeModal(id){document.getElementById(id).classList.remove('active');}
 function goToMenu(){
-  if(gameMode==='p2p') cleanupP2P();clearInterval(timerInterval);AUD.stopTheme();document.getElementById('story-dlg').classList.remove('show');showScreen('title-screen');}
+  if(gameMode==='p2p') cleanupP2P(true);clearInterval(timerInterval);AUD.stopTheme();document.getElementById('story-dlg').classList.remove('show');showScreen('title-screen');}
 
 /* ── ADS ── */
 const adPool=[{title:'⚔ Upgrade Your Kingdom!',sub:'Tap to claim your free gold reward'},{title:'🏰 Medieval Empire Builder',sub:'Build & conquer — Play Free'},{title:'🛡 War of Thrones',sub:'Join 10 million warriors worldwide'},{title:'👑 Royal Match — Play Now',sub:'Puzzle your way to the throne'},{title:'⚔ Clash of Castles',sub:'Lead your army to glory'},{title:'🗡 Blade & Honor',sub:'New season — limited time rewards'}];
@@ -3090,7 +3090,9 @@ function onP2PEvent(event, payload){
   }
 
   if(event==='p2p_resign' && payload.player!==p2pPlayerId){
-    showResult(p2pColor,'resign');
+    // Opponent resigned or left — current player wins
+    const winner = p2pColor; // I win
+    showResult(winner,'resign');
   }
 }
 
@@ -3132,11 +3134,42 @@ function startP2PGame(){
   showGameChatBtn();
 
   setP2PStatus('Connected ✓','#2ecc71');
+
+  // Heartbeat: send ping every 15s, detect if opponent gone
+  window._p2pHeartbeat = setInterval(()=>{
+    if(!p2pReady) return;
+    if(p2pWS && p2pWS.readyState===1){
+      p2pWS.sbSend('p2p_ping',{player:p2pPlayerId});
+    }
+  }, 15000);
+
+  // Poll DB every 20s to check if opponent still in room
+  window._p2pRoomCheck = setInterval(async()=>{
+    if(!p2pReady||!p2pRoomId) return;
+    try{
+      const rows = await sbSelect('chess_rooms','id=eq.'+p2pRoomId);
+      if(!rows||rows.length===0){
+        // Room deleted — opponent left
+        clearInterval(window._p2pRoomCheck);
+        if(p2pReady){
+          p2pReady=false;
+          showResult(p2pColor,'resign');
+        }
+      }
+    }catch(e){}
+  }, 20000);
 }
 
 // ── Cleanup ──
-function cleanupP2P(){
+function cleanupP2P(resigned){
+  // Notify opponent before closing
+  if(p2pReady && p2pWS && p2pWS.readyState===1){
+    try{
+      p2pWS.sbSend('p2p_resign',{player:p2pPlayerId});
+    }catch(e){}
+  }
   clearInterval(p2pPollTimer);
+  clearInterval(window._p2pHeartbeat);
   if(p2pWS){try{p2pWS.close();}catch(e){}}
   p2pWS=null; p2pReady=false; p2pColor=null;
   window.sbPlayerColor=null; window.sbBoardFlipped=false;
@@ -4118,6 +4151,18 @@ async function checkSupabaseStatus(){
 /* ══ INIT ══ */
 ['click','touchstart','keydown'].forEach(ev=>{
   document.addEventListener(ev,()=>AUD.unlock(),{once:true,passive:true});
+});
+
+// Notify opponent if player closes tab/browser during P2P game
+window.addEventListener('beforeunload',()=>{
+  if(gameMode==='p2p'&&p2pReady){
+    cleanupP2P(true);
+  }
+});
+window.addEventListener('pagehide',()=>{
+  if(gameMode==='p2p'&&p2pReady){
+    cleanupP2P(true);
+  }
 });
 
 window.addEventListener('load',()=>{
