@@ -2499,11 +2499,17 @@ function showResult(winner,reason){
   if(gameMode==='supabase' && window._currentOnlineTab==='ranked'){
     handleRankedGameEnd(winner, reason).catch(()=>{});
   }
-  const icons={checkmate:'🏆',stalemate:'🤝',timeout:'⏰',resign:'🏳️'},titles={checkmate:winner==='w'?'WHITE WINS!':'BLACK WINS!',stalemate:'STALEMATE',timeout:"TIME'S UP!",resign: winner===turn ? 'SURRENDER' : 'VICTORY!'},descs={
+  const icons={checkmate:'🏆',stalemate:'🤝',timeout:'⏰',resign:'🏳️'},titles={checkmate:winner==='w'?'WHITE WINS!':'BLACK WINS!',stalemate:'STALEMATE',timeout:"TIME'S UP!",resign:'GAME OVER'},descs={
     checkmate:`${winner==='w'?'White':'Black'} Army conquered the throne!`,
     stalemate:'No legal moves — stalemate! An honorable draw.',
     timeout:`${winner==='w'?'White':'Black'} Army wins! Time expired.`,
-    resign: winner ? (winner===turn?'Your army has surrendered.':'Opponent surrendered — You Win!') : 'Your army has surrendered.',
+    resign: (()=>{
+      const myColor=window.sbPlayerColor||p2pColor||(turn==='w'?'b':'w');
+      if(gameMode==='p2p'||gameMode==='supabase'){
+        return winner===myColor ? '🏆 Opponent surrendered — YOU WIN!' : '🏳️ You surrendered — You Lose.';
+      }
+      return winner===turn?'Your army has surrendered.':'Enemy surrendered — You Win!';
+    })(),
     insufficient:'Only kings remain — insufficient material to checkmate. Draw!',
     fiftymove:'50 moves without a capture or pawn move. Draw by fifty-move rule!',
     threefold:'Same position repeated 3 times. Draw by repetition!'
@@ -2520,7 +2526,21 @@ function undoMove(){
   selected=null;legalMoves=[];const logEl=document.getElementById('move-log');for(let i=0;i<steps;i++)if(logEl.lastChild&&logEl.lastChild.className==='me')logEl.removeChild(logEl.lastChild);renderBoard();updateStatus();
 }
 function confirmResign(){document.getElementById('resign-modal').classList.add('active');}
-function doResign(){closeModal('resign-modal');clearInterval(timerInterval);AUD.stopTheme();showResult(turn==='w'?'b':'w','resign');}
+function doResign(){
+  closeModal('resign-modal');
+  clearInterval(timerInterval);
+  AUD.stopTheme();
+  // In P2P: send resign signal to opponent THEN show lose screen
+  if(gameMode==='p2p' && p2pWS && p2pWS.readyState===1){
+    p2pWS.sbSend('p2p_resign',{player:p2pPlayerId});
+    // I resigned = I lose = opponent wins
+    // Show MY lose screen
+    showResult(p2pColor==='w'?'b':'w','resign'); // opponent color = winner
+  } else {
+    // Local/AI: current player resigns = other side wins
+    showResult(turn==='w'?'b':'w','resign');
+  }
+}
 
 /* ── AI ENGINE ── */
 /* ══════════════════════════════════════════════════
@@ -3090,9 +3110,10 @@ function onP2PEvent(event, payload){
   }
 
   if(event==='p2p_resign' && payload.player!==p2pPlayerId){
-    // Opponent resigned or left — current player wins
-    const winner = p2pColor; // I win
-    showResult(winner,'resign');
+    // Opponent resigned — I win!
+    clearInterval(timerInterval);
+    AUD.stopTheme();
+    showResult(p2pColor,'resign'); // p2pColor = my color = winner
   }
 }
 
