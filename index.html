@@ -2282,22 +2282,24 @@ const kId=gameMode==='conquest'&&piece.color==='b'&&activeConquestKingdom?active
 }
 function updateCaptured(){const pc={P:'♟',R:'♜',N:'♞',B:'♝',Q:'♛',K:'♚'};document.getElementById('p1-caps').textContent=capturedB.map(p=>pc[p]||p).join('');document.getElementById('p2-caps').textContent=capturedW.map(p=>pc[p]||p).join('');}
 function handleClick(r,c){
-  // Online/P2P mode: block if not your turn
-  if((gameMode==='supabase'||gameMode==='p2p') && turn!==window.sbPlayerColor) return;
+  const myColor = window.sbPlayerColor;
+
+  // Online/P2P: block if not your turn
+  if((gameMode==='supabase'||gameMode==='p2p') && turn!==myColor) return;
 
   const piece=board[r][c];
 
   if(selected){
     const mv=legalMoves.find(m=>m.r===r&&m.c===c);
     if(mv){
-      // Online: verify moving own piece
-      if(gameMode==='supabase'||gameMode==='p2p'){
+      // Online/P2P: only move your own pieces
+      if((gameMode==='supabase'||gameMode==='p2p')&&myColor){
         const mp=board[selected.r][selected.c];
-        if(!mp||mp.color!==sbPlayerColor){
+        if(!mp||mp.color!==myColor){
           selected=null;legalMoves=[];renderBoard();return;
         }
       }
-      // Local hotseat: verify moving current turn's piece
+      // Local: verify current turn's piece
       if(gameMode==='local'){
         const mp=board[selected.r][selected.c];
         if(!mp||mp.color!==turn){
@@ -2308,7 +2310,7 @@ function handleClick(r,c){
       return;
     }
     if(piece&&piece.color===turn){
-      if((gameMode==='supabase'||gameMode==='p2p')&&piece.color!==window.sbPlayerColor){
+      if((gameMode==='supabase'||gameMode==='p2p')&&myColor&&piece.color!==myColor){
         selected=null;legalMoves=[];renderBoard();return;
       }
       selected={r,c};legalMoves=getLegalMoves(r,c);renderBoard();return;
@@ -2316,9 +2318,9 @@ function handleClick(r,c){
     selected=null;legalMoves=[];renderBoard();return;
   }
 
-  // Select piece — only current turn's color
+  // Select piece
   if(piece&&piece.color===turn){
-    if((gameMode==='supabase'||gameMode==='p2p')&&piece.color!==window.sbPlayerColor) return;
+    if((gameMode==='supabase'||gameMode==='p2p')&&myColor&&piece.color!==myColor) return;
     selected={r,c};legalMoves=getLegalMoves(r,c);renderBoard();
   }
 }
