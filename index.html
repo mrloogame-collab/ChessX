@@ -758,7 +758,7 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
 <!-- STORY -->
 <div id="story-screen" class="screen" style="flex-direction:column;align-items:center;padding:28px 18px 75px;gap:14px;background:radial-gradient(ellipse at top,#0a0510 0%,#040306 70%)">
   <div class="scr-title">📜 The Chronicles</div>
-  <div class="story-chapters">
+  <div class="story-chapters" id="story-chapters">
     <div class="ch-card" onclick="startStory(1)"><div class="ch-num">I</div><div class="ch-info"><div class="ch-title">The First War</div><div class="ch-sub">A king rises. His first battle begins.</div></div><div>⚔️</div></div>
     <div class="ch-card" onclick="startStory(2)"><div class="ch-num">II</div><div class="ch-info"><div class="ch-title">The Dark Knight Rises</div><div class="ch-sub">Face the legendary Black Knight at dawn.</div></div><div>🗡️</div></div>
     <div class="ch-card" onclick="startStory(3)"><div class="ch-num">III</div><div class="ch-info"><div class="ch-title">Siege of the Iron Throne</div><div class="ch-sub">Storm the fortress. No retreat.</div></div><div>🏰</div></div>
@@ -772,7 +772,7 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
   <div class="mp-panel">
     <h3>HOST A GAME <span style="font-size:8px;color:#2ecc71;letter-spacing:2px">● P2P</span></h3>
     <p style="font-size:9px;color:var(--text-dim);margin-bottom:10px;font-family:sans-serif">Real peer-to-peer — share code with your friend anywhere</p>
-    <div class="room-code" id="room-code-display" onclick="copyRoomCode()" title="Click to copy">—</div>
+    <div class="room-code" id="room-code-display" id="copy-code-btn" onclick="copyRoomCode()" title="Click to copy">—</div>
     <button class="mp-btn" onclick="hostP2PGame()" id="host-btn">⚔ CREATE P2P ROOM</button>
     <div style="display:flex;align-items:center;justify-content:center;margin-top:10px;font-size:10px;color:var(--text-dim)">
       <span class="wifi-dot" id="host-dot" style="background:#888"></span>
@@ -881,7 +881,7 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
     style="padding:10px;font-size:11px;letter-spacing:2px;width:100%;background:rgba(201,168,76,0.08);border-color:rgba(201,168,76,0.3)">
     🏆 VIEW RANKINGS
   </button>
-  <button class="back-btn" onclick="cancelRealMatchmaking()">← BACK</button>
+  <button class="back-btn" onclick="cancelRealMatchmaking();showScreen('title-screen')">← BACK</button>
 </div>
 <!-- SETTINGS -->
 <div id="settings-screen" class="screen"><div class="settings-inner">
@@ -1284,6 +1284,47 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
 <div id="promo-modal"><div class="promo-box"><h3>⚔ PROMOTE SOLDIER</h3><div class="promo-choices" id="promo-choices"></div></div></div>
 <script>
 "use strict";
+
+/* ══ SUPABASE CONFIG + HELPERS ══ */
+const SUPA_URL = 'https://idhuobzqiwrzrlwiqqat.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaHVvYnpxaXdyenJsd2lxcWF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NzE5NDAsImV4cCI6MjA5NTU0Nzk0MH0._1-nGVdr6l58t9Be7EpnIReR_j2Hbog8nSVvhZ-HVgE';
+const SUPA_HDRS = {
+  'apikey': SUPA_KEY,
+  'Authorization': 'Bearer ' + SUPA_KEY,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=representation'
+};
+
+async function sbSelect(table, query=''){
+  const res = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+query, {headers: SUPA_HDRS});
+  if(!res.ok) throw new Error('sbSelect failed: '+res.status);
+  return res.json();
+}
+
+async function sbInsert(table, data){
+  const res = await fetch(SUPA_URL+'/rest/v1/'+table, {
+    method:'POST', headers: SUPA_HDRS, body: JSON.stringify(data)
+  });
+  if(!res.ok) throw new Error('sbInsert failed: '+res.status);
+  return res.json();
+}
+
+async function sbUpdate(table, query, data){
+  const res = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+query, {
+    method:'PATCH', headers: SUPA_HDRS, body: JSON.stringify(data)
+  });
+  if(!res.ok) throw new Error('sbUpdate failed: '+res.status);
+  return res.json();
+}
+
+async function sbDelete(table, query){
+  const res = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+query, {
+    method:'DELETE', headers: SUPA_HDRS
+  });
+  if(!res.ok) throw new Error('sbDelete failed: '+res.status);
+  return res.json().catch(()=>[]);
+}
+
 /* ── PARTICLE BG ── */
 (()=>{
   const c=document.getElementById('bg-canvas'),ctx=c.getContext('2d');
@@ -2153,6 +2194,7 @@ let moveHistory=[],capturedW=[],capturedB=[];
 let gameMode='',difficulty='',currentMode='',currentDifficulty='';
 let timers={w:600,b:600},timerInterval=null;
 let dialogQueue=[],dialogIdx=0;
+let halfMoveClock=0;
 let enPassantTarget=null,castlingRights={wK:true,wQ:true,bK:true,bQ:true};
 let lastFrom=null,lastTo=null;
 
@@ -2294,7 +2336,16 @@ function executeMove(fr,fc,tr,tc,mv){
   const files='abcdefgh',ranks='87654321',notation=`${piece.type}${files[fc]}${ranks[fr]}-${files[tc]}${ranks[tr]}`;
   const logEl=document.getElementById('move-log'),en=document.createElement('span');en.className='me';en.textContent=notation;logEl.appendChild(en);logEl.scrollTop=logEl.scrollHeight;
   document.getElementById('move-count').textContent=`Move ${Math.ceil(moveHistory.length/2)}`;
-  if(piece.type==='P'&&(tr===0||tr===7)){showPromotion(tr,tc,piece.color);return;}
+  if(piece.type==='P'&&(tr===0||tr===7)){
+    // AI always promotes to Queen automatically
+    if((gameMode==='single'||gameMode==='conquest')&&piece.color==='b'){
+      board[tr][tc]={type:'Q',color:'b'};
+      turn=turn==='w'?'b':'w';selected=null;legalMoves=[];renderBoard();updateStatus();
+      return;
+    }
+    // Human player gets choice dialog
+    showPromotion(tr,tc,piece.color);return;
+  }
   turn=turn==='w'?'b':'w';selected=null;legalMoves=[];renderBoard();updateStatus();
   if(gameMode==='p2p'&&!arguments[5]){
     // Only send if it's our piece
@@ -2351,73 +2402,10 @@ function showPromotion(r,c,color){
 
 // Get pseudo moves for a piece — NO mutual recursion
 // Castling legality checked separately in getLegalMoves
-function getPseudoMoves(r,c){
-  const p=board[r][c]; if(!p) return [];
-  const {type,color}=p;
-  const m=[];
-  const inB=(r,c)=>r>=0&&r<8&&c>=0&&c<8;
-  const enemy=(r,c)=>board[r][c]&&board[r][c].color!==color;
-  const empty=(r,c)=>!board[r][c];
-
-  if(type==='P'){
-    const dir=color==='w'?-1:1, start=color==='w'?6:1;
-    if(inB(r+dir,c)&&empty(r+dir,c)){
-      m.push({r:r+dir,c});
-      if(r===start&&empty(r+2*dir,c)) m.push({r:r+2*dir,c});
-    }
-    for(const dc of[-1,1]){
-      const nr=r+dir,nc=c+dc;
-      if(inB(nr,nc)){
-        if(enemy(nr,nc)) m.push({r:nr,c:nc});
-        else if(enPassantTarget&&enPassantTarget.r===nr&&enPassantTarget.c===nc)
-          m.push({r:nr,c:nc,enPassant:true});
-      }
-    }
-  }
-  if(type==='N'){
-    for(const [dr,dc] of[[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]]){
-      const nr=r+dr,nc=c+dc;
-      if(inB(nr,nc)&&(!board[nr][nc]||enemy(nr,nc))) m.push({r:nr,c:nc});
-    }
-  }
-  if(type==='K'){
-    for(const [dr,dc] of[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]){
-      const nr=r+dr,nc=c+dc;
-      if(inB(nr,nc)&&(!board[nr][nc]||enemy(nr,nc))) m.push({r:nr,c:nc});
-    }
-    // Castling — check squares empty (attack check done in getLegalMoves)
-    if(color==='w'&&r===7){
-      if(castlingRights.wK&&!board[7][5]&&!board[7][6]) m.push({r:7,c:6,castle:true});
-      if(castlingRights.wQ&&!board[7][3]&&!board[7][2]&&!board[7][1]) m.push({r:7,c:2,castle:true});
-    }
-    if(color==='b'&&r===0){
-      if(castlingRights.bK&&!board[0][5]&&!board[0][6]) m.push({r:0,c:6,castle:true});
-      if(castlingRights.bQ&&!board[0][3]&&!board[0][2]&&!board[0][1]) m.push({r:0,c:2,castle:true});
-    }
-  }
-  for(const [type2,dirs] of[
-    ['R',[[0,1],[0,-1],[1,0],[-1,0]]],
-    ['B',[[1,1],[1,-1],[-1,1],[-1,-1]]],
-    ['Q',[[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]]
-  ]){
-    if(type!==type2) continue;
-    for(const [dr,dc] of dirs){
-      let nr=r+dr,nc=c+dc;
-      while(inB(nr,nc)){
-        if(empty(nr,nc)) m.push({r:nr,c:nc});
-        else{ if(enemy(nr,nc)) m.push({r:nr,c:nc}); break; }
-        nr+=dr; nc+=dc;
-      }
-    }
-  }
-  return m;
-}
+/* removed duplicate getPseudoMoves */
 
 // Safe square-attacked check using FLAT board — no global board mutation
-function isSA(r,c,myColor){
-  const ab=boardToAI(); // isolated snapshot
-  return aiSquareAttacked(ab,r,c,myColor);
-}
+/* removed duplicate isSA */
 
 // Check if a square is attacked on a flat board (no recursion risk)
 function aiSquareAttacked(ab,r,c,myColor){
@@ -2432,64 +2420,13 @@ function aiSquareAttacked(ab,r,c,myColor){
 }
 
 // isInCheck using isolated flat board — zero global mutation
-function isInCheck(color){
-  const ab=boardToAI();
-  return aiInCheck(ab,color);
-}
+/* removed duplicate isInCheck */
 
 // getLegalMoves — uses flat board copy for legality, never corrupts global board
-function getLegalMoves(r,c){
-  const piece=board[r][c]; if(!piece) return [];
-  const ab=boardToAI();
-  const legal=[];
-
-  for(const mv of getPseudoMoves(r,c)){
-    // Apply move to isolated copy
-    const ab2=ab.slice();
-    aiSet(ab2,mv.r,mv.c,{t:piece.type,c:piece.color});
-    aiSet(ab2,r,c,null);
-
-    // Handle en passant on copy
-    if(mv.enPassant&&enPassantTarget){
-      aiSet(ab2,enPassantTarget.pawnR,enPassantTarget.pawnC,null);
-    }
-
-    // Check legality: king must not be in check after move
-    if(aiInCheck(ab2,piece.color)) continue;
-
-    // Castling: king must not pass through attacked squares
-    if(mv.castle){
-      const step=mv.c>c?1:-1;
-      const midC=c+step;
-      // Check: from square, mid square, and landing square must all be safe
-      const ab3=ab.slice(); // check from original position
-      if(aiInCheck(ab3,piece.color)) continue; // can't castle in check
-      const abMid=ab.slice();
-      aiSet(abMid,r,midC,{t:'K',c:piece.color}); aiSet(abMid,r,c,null);
-      if(aiInCheck(abMid,piece.color)) continue; // can't pass through check
-    }
-
-    legal.push(mv);
-  }
-  return legal;
-}
+/* removed duplicate getLegalMoves */
 
 // hasLM — uses AI legal moves for performance
-function hasLM(color){
-  const ab=boardToAI();
-  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
-    const p=aiGet(ab,r,c);
-    if(!p||p.c!==color) continue;
-    // Quick pseudo check first, then legality
-    const pseudo=aiPseudo(ab,r,c);
-    for(const [nr,nc] of pseudo){
-      const ab2=ab.slice();
-      aiSet(ab2,nr,nc,p); aiSet(ab2,r,c,null);
-      if(!aiInCheck(ab2,color)) return true;
-    }
-  }
-  return false;
-}
+/* removed duplicate hasLM */
 
 function updateStatus(){
   // ── DRAW CONDITIONS — checked FIRST before checkmate ──
@@ -2762,7 +2699,8 @@ function aiEval(ab){
     if(p.t==='K'){ if(p.c==='w')wKing={r,c}; else bKing={r,c}; }
     if(p.c==='w') wPieces++; else bPieces++;
   }
-  const endgame = (wPieces+bPieces) <= 10;
+  const endgame = (wPieces+bPieces) <= 12;
+  const mopup = (wPieces+bPieces) <= 4; // K+Q vs K type endgame
 
   for(let r=0;r<8;r++) for(let c=0;c<8;c++){
     const p=aiGet(ab,r,c); if(!p) continue;
@@ -2864,20 +2802,36 @@ function aiEval(ab){
         const oKing=p.c==='w'?bKing:wKing;
         if(oKing){
           const dist=Math.abs(r-oKing.r)+Math.abs(c-oKing.c);
-          val+=(14-dist)*8; // Chase opponent king
+          // In mopup endgame push enemy king to corner
+          if(mopup){
+            val+=(14-dist)*20; // Stronger chase
+            // Bonus for pushing enemy king to edge/corner
+            const oppEdge=Math.max(Math.abs(oKing.r-3.5),Math.abs(oKing.c-3.5));
+            val+=Math.round(oppEdge*15)*(p.c==='w'?1:-1)*0; // accounted in oppKing
+          } else {
+            val+=(14-dist)*10;
+          }
         }
-        // King centralization in endgame
-        val+=Math.round((3.5-Math.abs(r-3.5))*10+(3.5-Math.abs(c-3.5))*10);
+        // King centralization
+        val+=Math.round((3.5-Math.abs(r-3.5))*12+(3.5-Math.abs(c-3.5))*12);
       }
     }
 
     score+=p.c==='w'?val:-val;
   }
 
-  // ── CHECKMATE THREAT: massive bonus for putting opponent in check ──
-  const oppColor=aiInCheck(ab,'b')?'b':'w';
-  if(aiInCheck(ab,'b')) score+=200;  // white has black in check
-  if(aiInCheck(ab,'w')) score-=200;  // black has white in check
+  // ── MOPUP: push enemy king to corner in endgame ──
+  if(mopup&&wKing&&bKing){
+    // Push black king to corner
+    const bKingEdge=Math.max(Math.abs(bKing.r-3.5),Math.abs(bKing.c-3.5));
+    score+=Math.round(bKingEdge*20); // Further from center = better for white
+    // Bring white king close to black king
+    const kingDist=Math.abs(wKing.r-bKing.r)+Math.abs(wKing.c-bKing.c);
+    score+=(14-kingDist)*15;
+  }
+  // ── CHECKMATE THREAT ──
+  if(aiInCheck(ab,'b')) score+=300;
+  if(aiInCheck(ab,'w')) score-=300;
 
   // ── MOBILITY: reward having more legal moves ──
   const wMoves=aiLegal(ab,'w').length;
@@ -2907,7 +2861,12 @@ function aiMinimax(ab,depth,alpha,beta,isMax){
 // Main AI entry point — copies global board once, searches, returns best move
 function doAIMove(){
   const depthMap={easy:1,medium:3,hard:4,conquest:2,online:2};
-  const depth=depthMap[difficulty]||depthMap[gameMode]||2;
+  // Count total pieces for endgame depth boost
+  let totalPieces=0;
+  for(let rr=0;rr<8;rr++)for(let cc=0;cc<8;cc++)if(board[rr][cc])totalPieces++;
+  const baseDepth=depthMap[difficulty]||depthMap[gameMode]||2;
+  // Increase depth in endgame (fewer pieces = faster search)
+  const depth=totalPieces<=6?Math.min(baseDepth+2,6):totalPieces<=10?Math.min(baseDepth+1,5):baseDepth;
 
   // Take snapshot of current global board
   const ab=boardToAI();
@@ -2973,21 +2932,9 @@ function aiUndoMove(saved){restoreBoard(saved.snap);enPassantTarget=saved.sep;ca
 ══════════════════════════════════════════════ */
 let roomCode='';
 
-function generateRoomCode(){
-  const ch='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  roomCode=Array.from({length:6},()=>ch[Math.floor(Math.random()*ch.length)]).join('');
-  const el=document.getElementById('room-code-display');
-  if(el) el.textContent=roomCode;
-}
+/* removed duplicate generateRoomCode */
 
-function loadPeerJS(cb){
-  if(window.Peer){cb();return;}
-  const s=document.createElement('script');
-  s.src='https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
-  s.onload=()=>cb(false);
-  s.onerror=()=>cb(true);
-  document.head.appendChild(s);
-}
+/* removed duplicate loadPeerJS */
 
 /* ══════════════════════════════════════════════
    P2P MULTIPLAYER — COMPLETE REWRITE
@@ -3812,20 +3759,26 @@ async function cleanStaleRooms(){
 /* ══ DRAW CONDITIONS ══ */
 function isInsufficientMaterial(){
   const pieces=[];
-  for(let r=0;r<8;r++)for(let c=0;c<8;c++)if(board[r][c])pieces.push(board[r][c]);
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+    if(board[r][c])pieces.push(board[r][c]);
+  }
   const w=pieces.filter(p=>p.color==='w');
   const b=pieces.filter(p=>p.color==='b');
   const onlyK=a=>a.length===1&&a[0].type==='K';
-  const kAndB=a=>a.length===2&&a.some(p=>p.type==='K')&&a.some(p=>p.type==='B');
-  const kAndN=a=>a.length===2&&a.some(p=>p.type==='K')&&a.some(p=>p.type==='N');
+  // K vs K - always draw
   if(onlyK(w)&&onlyK(b))return true;
-  if(kAndB(w)&&onlyK(b))return true;
-  if(onlyK(w)&&kAndB(b))return true;
-  if(kAndN(w)&&onlyK(b))return true;
-  if(onlyK(w)&&kAndN(b))return true;
+  // K+B vs K - draw
+  const wKB=w.length===2&&w.some(p=>p.type==='K')&&w.some(p=>p.type==='B');
+  const bKB=b.length===2&&b.some(p=>p.type==='K')&&b.some(p=>p.type==='B');
+  // K+N vs K - draw
+  const wKN=w.length===2&&w.some(p=>p.type==='K')&&w.some(p=>p.type==='N');
+  const bKN=b.length===2&&b.some(p=>p.type==='K')&&b.some(p=>p.type==='N');
+  if((wKB||wKN)&&onlyK(b))return true;
+  if(onlyK(w)&&(bKB||bKN))return true;
+  // NOTE: K+Q vs K, K+R vs K, K+B vs K+B etc are NOT draws - game continues
   return false;
 }
-let halfMoveClock=0;
+
 function updateHalfMoveClock(piece,captured){
   if(captured||piece.type==='P')halfMoveClock=0;else halfMoveClock++;
 }
@@ -3863,14 +3816,54 @@ function flatPseudo(f,r,c){
   const m=[];
   if(t==='P'){
     const d=col==='w'?-1:1,s=col==='w'?6:1;
-    if(fb(r+d,c)&&empty(r+d,c)){m.push([r+d,c]);if(r===s&&empty(r+2*d,c))m.push([r+2*d,c]);}
-    for(const dc of[-1,1])if(fb(r+d,c+dc)&&enemy(r+d,c+dc))m.push([r+d,c+dc]);
+    if(fb(r+d,c)&&empty(r+d,c)){
+      m.push([r+d,c]);
+      if(r===s&&empty(r+2*d,c))m.push([r+2*d,c]);
+    }
+    for(const dc of[-1,1]){
+      if(fb(r+d,c+dc)){
+        if(enemy(r+d,c+dc)) m.push([r+d,c+dc]); // normal capture
+        else if(empty(r+d,c+dc)&&enPassantTarget&&  // en passant
+                enPassantTarget.r===r+d&&enPassantTarget.c===c+dc)
+          m.push([r+d,c+dc]);
+      }
+    }
   }
-  if(t==='N'){for(const[dr,dc]of[[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]]){const nr=r+dr,nc=c+dc;if(fb(nr,nc)&&(!fg(f,nr,nc)||enemy(nr,nc)))m.push([nr,nc]);}}
-  if(t==='K'){for(const[dr,dc]of[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]){const nr=r+dr,nc=c+dc;if(fb(nr,nc)&&(!fg(f,nr,nc)||enemy(nr,nc)))m.push([nr,nc]);}}
+  if(t==='N'){
+    for(const[dr,dc]of[[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]]){
+      const nr=r+dr,nc=c+dc;
+      if(fb(nr,nc)&&(!fg(f,nr,nc)||enemy(nr,nc)))m.push([nr,nc]);
+    }
+  }
+  if(t==='K'){
+    for(const[dr,dc]of[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]){
+      const nr=r+dr,nc=c+dc;
+      if(fb(nr,nc)&&(!fg(f,nr,nc)||enemy(nr,nc)))m.push([nr,nc]);
+    }
+    // Castling — generate 2-square moves so getLegalMoves can validate them
+    if(col==='w'&&r===7&&c===4){
+      if(castlingRights.wK&&empty(7,5)&&empty(7,6)&&fg(f,7,7)&&fg(f,7,7).t==='R')
+        m.push([7,6]);
+      if(castlingRights.wQ&&empty(7,3)&&empty(7,2)&&empty(7,1)&&fg(f,7,0)&&fg(f,7,0).t==='R')
+        m.push([7,2]);
+    }
+    if(col==='b'&&r===0&&c===4){
+      if(castlingRights.bK&&empty(0,5)&&empty(0,6)&&fg(f,0,7)&&fg(f,0,7).t==='R')
+        m.push([0,6]);
+      if(castlingRights.bQ&&empty(0,3)&&empty(0,2)&&empty(0,1)&&fg(f,0,0)&&fg(f,0,0).t==='R')
+        m.push([0,2]);
+    }
+  }
   for(const[tp,dirs]of[['R',[[0,1],[0,-1],[1,0],[-1,0]]],['B',[[1,1],[1,-1],[-1,1],[-1,-1]]],['Q',[[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]]]){
     if(t!==tp)continue;
-    for(const[dr,dc]of dirs){let nr=r+dr,nc=c+dc;while(fb(nr,nc)){if(empty(nr,nc))m.push([nr,nc]);else{if(enemy(nr,nc))m.push([nr,nc]);break;}nr+=dr;nc+=dc;}}
+    for(const[dr,dc]of dirs){
+      let nr=r+dr,nc=c+dc;
+      while(fb(nr,nc)){
+        if(empty(nr,nc))m.push([nr,nc]);
+        else{if(enemy(nr,nc))m.push([nr,nc]);break;}
+        nr+=dr;nc+=dc;
+      }
+    }
   }
   return m;
 }
@@ -4013,7 +4006,8 @@ function cancelRealMatchmaking(){
   if(realtimeWS){try{realtimeWS.close();}catch(e){}realtimeWS=null;}
   sbRoomId=null;sbPlayerColor=null;resetMMWrap();
   const chatEl=document.getElementById('online-chat-panel');if(chatEl)chatEl.style.display='none';
-  showScreen('online-screen');
+  // Only redirect if not called with explicit destination
+  if(!arguments[0]) showScreen('title-screen');
 }
 
 function startOnlineGame(myColor,opponentName){
@@ -4065,6 +4059,37 @@ function sbRealtime(roomId,onEvent){
   return ws;
 }
 
+
+
+function copyRoomCode(){
+  const el=document.getElementById('room-code-display');
+  const code=el?.textContent?.trim();
+  if(code&&code!=='------'&&code.length===6){
+    navigator.clipboard?.writeText(code).then(()=>{
+      const btn=document.getElementById('copy-code-btn');
+      if(btn){const old=btn.textContent;btn.textContent='✓ COPIED!';btn.style.color='#2ecc71';setTimeout(()=>{btn.textContent=old;btn.style.color='';},2000);}
+    }).catch(()=>{alert('Room code: '+code);});
+  }
+}
+
+
+async function checkSupabaseStatus(){
+  try{
+    const res=await fetch(SUPA_URL+'/rest/v1/chess_rooms?limit=1',{headers:SUPA_HDRS});
+    if(res.ok){
+      const dot=document.getElementById('sb-status-dot');
+      if(dot)dot.style.color='#2ecc71';
+      const countEl=document.getElementById('online-count');
+      const gamesEl=document.getElementById('games-count');
+      if(countEl)countEl.textContent='✓ Live';
+      if(gamesEl)gamesEl.textContent='Ready';
+      autoMigrate().catch(()=>{});
+    }
+  }catch(e){
+    const dot=document.getElementById('sb-status-dot');
+    if(dot)dot.style.color='#e74c3c';
+  }
+}
 
 /* ══ INIT ══ */
 ['click','touchstart','keydown'].forEach(ev=>{
