@@ -1468,7 +1468,16 @@ function showScreen(id){
 }
 function closeModal(id){document.getElementById(id).classList.remove('active');}
 function goToMenu(){
-  if(gameMode==='p2p') cleanupP2P(true);clearInterval(timerInterval);AUD.stopTheme();document.getElementById('story-dlg').classList.remove('show');showScreen('title-screen');}
+  if(gameMode==='p2p') cleanupP2P(true);
+  if(gameMode==='supabase'){
+    clearInterval(timerInterval);
+    clearInterval(window.sbTimerSync);
+    clearInterval(sbPollTimer);
+    if(realtimeWS){try{realtimeWS.close();}catch(e){}realtimeWS=null;}
+    sbIsSearching=false;
+    sbRoomId=null;sbPlayerColor=null;
+    gameMode='';
+  }clearInterval(timerInterval);AUD.stopTheme();document.getElementById('story-dlg').classList.remove('show');showScreen('title-screen');}
 
 /* ── ADS ── */
 const adPool=[{title:'⚔ Upgrade Your Kingdom!',sub:'Tap to claim your free gold reward'},{title:'🏰 Medieval Empire Builder',sub:'Build & conquer — Play Free'},{title:'🛡 War of Thrones',sub:'Join 10 million warriors worldwide'},{title:'👑 Royal Match — Play Now',sub:'Puzzle your way to the throne'},{title:'⚔ Clash of Castles',sub:'Lead your army to glory'},{title:'🗡 Blade & Honor',sub:'New season — limited time rewards'}];
@@ -2529,19 +2538,19 @@ function doResign(){
   closeModal('resign-modal');
   clearInterval(timerInterval);
   AUD.stopTheme();
+  window._iResigned = true; // I am resigning = I lose
   if(gameMode==='p2p'){
-    // Send resign to opponent via realtime
     if(p2pWS && p2pWS.readyState===1){
       p2pWS.sbSend('p2p_resign',{player:p2pPlayerId});
     }
-    // Also mark in DB as fallback
-    if(p2pRoomId){
-      sbUpdate('chess_rooms','id=eq.'+p2pRoomId,{status:'resigned',last_move:'RESIGN_'+p2pPlayerId}).catch(()=>{});
-    }
-    // I resigned = I lose
-    // window._iResigned = true means show lose screen
-    window._iResigned = true;
     showResult(p2pColor==='w'?'b':'w','resign');
+  } else if(gameMode==='supabase'){
+    // Send resign to opponent via realtime
+    if(realtimeWS && realtimeWS.readyState===1){
+      realtimeWS.sbSend('resign',{player:sbPlayerId});
+    }
+    // I resigned = opponent wins = show my lose screen
+    showResult(sbPlayerColor==='w'?'b':'w','resign');
   } else {
     showResult(turn==='w'?'b':'w','resign');
   }
@@ -3741,7 +3750,10 @@ function onRemoteChat(payload){
 
 function onRemoteResign(){
   sbSystemMsg(sbOpponentName+' resigned!');
-  showResult('w'===sbPlayerColor?'w':'b','resign');
+  window._iResigned = false; // opponent resigned, not me = I win
+  clearInterval(timerInterval);
+  AUD.stopTheme();
+  showResult(sbPlayerColor,'resign'); // I win
 }
 
 function onDrawOffer(){sbSystemMsg(sbOpponentName+' offers a draw');}
@@ -4086,10 +4098,14 @@ async function startRealMatchmaking(){
           clearInterval(elTimer);
           clearInterval(hb);
           
-          const iAmHost=sbPlayerId<data.id;
+          // Use timestamp in ID to determine host (lower timestamp = host = white)
+          const myTime=parseInt(sbPlayerId.split('_')[1]||'0');
+          const theirTime=parseInt(data.id.split('_')[1]||'0');
+          const iAmHost=myTime <= theirTime; // earlier = host = white
           sbPlayerColor=iAmHost?'w':'b';
           sbOpponentName=data.name||'Opponent';
           sbRoomId='game_'+[sbPlayerId,data.id].sort().join('_');
+          window.sbPlayerColor=sbPlayerColor; // ensure window copy is set
           
           // Send match confirmation
           ws.send(JSON.stringify({
@@ -4127,7 +4143,8 @@ async function startRealMatchmaking(){
           clearInterval(elTimer);
           clearInterval(hb);
 
-          sbPlayerColor=data.color==='w'?'b':'w'; // opposite of host
+          sbPlayerColor=data.color==='w'?'b':'w'; // opposite of sender
+          window.sbPlayerColor=sbPlayerColor; // ensure window copy is set
           sbOpponentName=data.fromName||'Opponent';
           sbRoomId=data.roomId;
 
