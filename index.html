@@ -1287,7 +1287,7 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
 
 /* ══ SUPABASE CONFIG + HELPERS ══ */
 const SUPA_URL = 'https://idhuobzqiwrzrlwiqqat.supabase.co';
-const SUPA_KEY = 'sb_publishable_wAfqKuUr4ORUTtpVOPjxSg_7Bgc-6Iv';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlkaHVvYnpxaXdyenJsd2lxcWF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5NzE5NDAsImV4cCI6MjA5NTU0Nzk0MH0._1-nGVdr6l58t9Be7EpnIReR_j2Hbog8nSVvhZ-HVgE';
 const SUPA_HDRS = {
   'apikey': SUPA_KEY,
   'Authorization': 'Bearer ' + SUPA_KEY,
@@ -4000,123 +4000,174 @@ async function startRealMatchmaking(){
   const myName=getPlayerName(), myRating=getPlayerRating();
   const matchMode=window._currentOnlineTab||'quick';
   let elapsed=0;
-  document.getElementById('sb-status-dot').style.color='#2ecc71';
-  showMMSearching(0,'Searching for '+matchMode+' match…');
+  const modeLabel=matchMode==='ranked'?'Ranked':'Quick';
+  showMMSearching(0,'Connecting…');
   const elTimer=setInterval(()=>{
     elapsed++;
     if(sbIsSearching) showMMSearching(elapsed,
       elapsed<5?'Scanning for opponents…':
       elapsed<15?'Looking worldwide…':
-      elapsed<30?'Still searching — please wait…':
-      'Waiting for opponents to connect…');
+      'Waiting for players…');
   },1000);
 
   try{
-    // Test connection first
-    const testRes = await fetch(SUPA_URL+'/rest/v1/chess_rooms?limit=1&apikey='+SUPA_KEY,{headers:SUPA_HDRS});
-    if(!testRes.ok){
-      throw new Error('Server error: '+testRes.status+' '+testRes.statusText);
-    }
-    // Clean up any old rooms from this player (ignore errors)
-    try{ await sbDelete('chess_rooms','host_id=eq.'+sbPlayerId+'&status=eq.waiting'); }catch(e){}
+    // Connect to shared matchmaking channel via WebSocket
+    const mmChannel='chessx_mm_'+matchMode;
+    const ws=new WebSocket(
+      SUPA_URL.replace('https://','wss://')+
+      '/realtime/v1/websocket?apikey='+SUPA_KEY+'&vsn=1.0.0'
+    );
 
-    // Random stagger 0-1s to avoid race condition when all phones start together
-    await new Promise(res=>setTimeout(res, Math.random()*1000));
+    let matched=false;
+    let hb=null;
 
-    // Step 1: Try to join an existing room (keep trying for 5s)
-    let joined=false;
-    const searchEnd=Date.now()+5000; // search for 5 seconds
-    while(!joined && Date.now()<searchEnd && sbIsSearching){
+    ws.onopen=()=>{
+      // Join matchmaking channel
+      ws.send(JSON.stringify({
+        topic:'realtime:'+mmChannel,
+        event:'phx_join',
+        payload:{config:{broadcast:{self:false},presence:{key:sbPlayerId}}},
+        ref:'mm1'
+      }));
+      // Start heartbeat
+      hb=setInterval(()=>{
+        if(ws.readyState===1)
+          ws.send(JSON.stringify({topic:'phoenix',event:'heartbeat',payload:{},ref:'hb'}));
+      },20000);
+      showMMSearching(elapsed,'Searching for '+modeLabel+' opponent…');
+      
+      // Broadcast our presence
+      setTimeout(()=>{
+        if(ws.readyState===1&&!matched){
+          ws.send(JSON.stringify({
+            topic:'realtime:'+mmChannel,
+            event:'broadcast',
+            payload:{
+              type:'broadcast',
+              event:'looking',
+              payload:{id:sbPlayerId,name:myName,rating:myRating,mode:matchMode}
+            },
+            ref:'look1'
+          }));
+        }
+      },500+Math.random()*1000);
+
+      // Keep broadcasting every 3s until matched
+      const broadcastTimer=setInterval(()=>{
+        if(!sbIsSearching||matched){clearInterval(broadcastTimer);return;}
+        if(ws.readyState===1){
+          ws.send(JSON.stringify({
+            topic:'realtime:'+mmChannel,
+            event:'broadcast',
+            payload:{
+              type:'broadcast',
+              event:'looking',
+              payload:{id:sbPlayerId,name:myName,rating:myRating,mode:matchMode}
+            },
+            ref:'look'+Date.now()
+          }));
+        }
+      },3000);
+    };
+
+    ws.onmessage=(e)=>{
+      if(matched||!sbIsSearching)return;
       try{
-        // Search online rooms only (not P2P or friend rooms)
-        const open=await sbSelect('chess_rooms','status=eq.waiting&order=created_at.asc&limit=20');
-        const now=Date.now();
-        const valid=(open||[]).filter(r=>
-          r.host_id!==sbPlayerId &&
-          !r.id.startsWith('P2P_') && // exclude P2P rooms
-          r.mode!=='p2p' && r.mode!=='friend' && // exclude P2P and friend
-          (now-new Date(r.created_at).getTime())<120000
-        );
-        for(const room of valid){
-          if(!sbIsSearching) break;
-          try{
-            const result=await sbUpdate('chess_rooms',
-              'id=eq.'+room.id+'&status=eq.waiting',
-              {guest_id:sbPlayerId,guest_name:myName,guest_rating:myRating,status:'playing'});
-            if(result&&result.length>0){
-              // Successfully joined!
-              sbRoomId=room.id;
-              sbPlayerColor='b';
-              sbOpponentName=room.host_name||'Opponent';
-              joined=true;
-              clearInterval(elTimer);
-              storeOpponentRating(room.host_rating||1200);
-              showMMFound(sbOpponentName,room.host_rating||1200,'b');
+        const msg=JSON.parse(e.data);
+        if(msg.event!=='broadcast'||!msg.payload)return;
+        const evt=msg.payload.event;
+        const data=msg.payload.payload;
+        if(!data||data.id===sbPlayerId)return;
+
+        if(evt==='looking'){
+          // Someone is looking - I'll match with them
+          // Determinate who is host: lower ID = host (white)
+          matched=true;
+          clearInterval(elTimer);
+          clearInterval(hb);
+          
+          const iAmHost=sbPlayerId<data.id;
+          sbPlayerColor=iAmHost?'w':'b';
+          sbOpponentName=data.name||'Opponent';
+          sbRoomId='game_'+[sbPlayerId,data.id].sort().join('_');
+          
+          // Send match confirmation
+          ws.send(JSON.stringify({
+            topic:'realtime:'+mmChannel,
+            event:'broadcast',
+            payload:{
+              type:'broadcast',
+              event:'matched',
+              payload:{
+                to:data.id,
+                from:sbPlayerId,
+                fromName:myName,
+                fromRating:myRating,
+                roomId:sbRoomId,
+                color:iAmHost?'w':'b'
+              }
+            },
+            ref:'match1'
+          }));
+
+          ws.close();
+          storeOpponentRating(data.rating||1200);
+          showMMFound(sbOpponentName,data.rating||1200,sbPlayerColor);
+          setTimeout(()=>{
+            if(sbIsSearching){
               connectRealtime(sbRoomId);
-              setTimeout(()=>{if(sbIsSearching)startOnlineGame('b',sbOpponentName);},1500);
-              break;
+              startOnlineGame(sbPlayerColor,sbOpponentName);
             }
-          }catch(e){continue;}
+          },1500);
         }
-      }catch(e){}
-      if(!joined) await new Promise(res=>setTimeout(res,500));
-    }
 
-    if(joined) return;
+        if(evt==='matched'&&data.to===sbPlayerId){
+          // Someone matched with me
+          matched=true;
+          clearInterval(elTimer);
+          clearInterval(hb);
 
-    // Step 2: Create a room and wait for someone to join
-    if(!sbIsSearching) return;
-    sbRoomId='r_'+Date.now()+'_'+Math.random().toString(36).substr(2,9)+'_'+Math.random().toString(36).substr(2,4);
-    sbPlayerColor='w';
-    // Try inserting with retry on duplicate key
-    let insertOk = false;
-    for(let attempt=0; attempt<3; attempt++){
-      try{
-        await sbInsert('chess_rooms',{
-          id:sbRoomId, host_id:sbPlayerId, host_name:myName,
-          host_rating:myRating, status:'waiting', board_state:'',
-          current_turn:'w', last_move:'', mode:matchMode
-        });
-        insertOk = true;
-        break;
-      }catch(insertErr){
-        if(insertErr.message.includes('409')||insertErr.message.includes('23505')){
-          // Duplicate key - generate new ID and retry
-          sbRoomId='r_'+Date.now()+'_'+Math.random().toString(36).substr(2,9);
-          await new Promise(res=>setTimeout(res,200));
-        } else {
-          throw insertErr; // different error - rethrow
+          sbPlayerColor=data.color==='w'?'b':'w'; // opposite of host
+          sbOpponentName=data.fromName||'Opponent';
+          sbRoomId=data.roomId;
+
+          ws.close();
+          storeOpponentRating(data.fromRating||1200);
+          showMMFound(sbOpponentName,data.fromRating||1200,sbPlayerColor);
+          setTimeout(()=>{
+            if(sbIsSearching){
+              connectRealtime(sbRoomId);
+              startOnlineGame(sbPlayerColor,sbOpponentName);
+            }
+          },1500);
         }
+      }catch(err){}
+    };
+
+    ws.onerror=()=>{
+      if(!matched){
+        clearInterval(elTimer);clearInterval(hb);
+        sbIsSearching=false;resetMMWrap();
+        const mmw=document.getElementById('mm-wrap');
+        if(mmw)mmw.innerHTML=`<div style="text-align:center;padding:10px">
+          <div style="font-size:28px;margin-bottom:8px">📡</div>
+          <div style="font-size:11px;color:#e74c3c;letter-spacing:2px;margin-bottom:12px">CONNECTION FAILED</div>
+          <button class="mp-btn" onclick="startRealMatchmaking()"
+            style="padding:10px 30px;font-size:12px;letter-spacing:2px;width:100%">🔄 TRY AGAIN</button>
+        </div>`;
       }
-    }
-    if(!insertOk) throw new Error('Could not create room after 3 attempts');
-    connectRealtime(sbRoomId);
-    showMMSearching(elapsed,'Room created — waiting for opponent…');
+    };
 
-    // Poll own room AND keep searching for other rooms simultaneously
-    let pollCount=0;
-    sbPollTimer=setInterval(async()=>{
-      if(!sbIsSearching){clearInterval(sbPollTimer);return;}
-      pollCount++;
-      try{
-        // Check if someone joined our room
-        const rows=await sbSelect('chess_rooms','id=eq.'+sbRoomId);
-        if(!rows||rows.length===0){clearInterval(sbPollTimer);return;}
-        if(rows[0].status==='playing'&&rows[0].guest_id){
-          clearInterval(sbPollTimer);clearInterval(elTimer);
-          sbOpponentName=rows[0].guest_name||'Opponent';
-          storeOpponentRating(rows[0].guest_rating||1200);
-          showMMFound(sbOpponentName,rows[0].guest_rating||1200,'w');
-          setTimeout(()=>{if(sbIsSearching)startOnlineGame('w',sbOpponentName);},1500);
-        }
-      }catch(e){}
-    },1500);
+    ws.onclose=()=>{clearInterval(hb);};
+
+    // Store ws for cancel
+    window._mmWS=ws;
 
     // Timeout after 90s
     setTimeout(()=>{
-      if(sbIsSearching&&sbPlayerColor==='w'){
-        clearInterval(sbPollTimer);clearInterval(elTimer);
-        sbDelete('chess_rooms','id=eq.'+sbRoomId).catch(()=>{});
+      if(sbIsSearching&&!matched){
+        clearInterval(elTimer);
+        try{ws.close();}catch(e){}
         sbIsSearching=false;resetMMWrap();
         sbSystemMsg('No opponent found — try again!');
       }
@@ -4125,22 +4176,16 @@ async function startRealMatchmaking(){
   }catch(err){
     clearInterval(elTimer);
     sbIsSearching=false;resetMMWrap();
-    document.getElementById('sb-status-dot').style.color='#e74c3c';
-    const errMsg=err.message||'Unknown error';
-    console.error('Matchmaking error:',errMsg);
-    // Show error with actual message for debugging
-    sbSystemMsg('Error: '+errMsg.substring(0,50));
     const mmw=document.getElementById('mm-wrap');
     if(mmw)mmw.innerHTML=`<div style="text-align:center;padding:10px">
       <div style="font-size:28px;margin-bottom:8px">📡</div>
       <div style="font-size:11px;color:#e74c3c;letter-spacing:2px;margin-bottom:12px">CONNECTION FAILED</div>
-      <div style="font-size:9px;color:#888;margin-bottom:8px">${errMsg.substring(0,60)}</div>
+      <div style="font-size:9px;color:#888;margin-bottom:8px">${(err.message||'').substring(0,60)}</div>
       <button class="mp-btn" onclick="startRealMatchmaking()"
         style="padding:10px 30px;font-size:12px;letter-spacing:2px;width:100%">🔄 TRY AGAIN</button>
     </div>`;
   }
 }
-
 function cancelRealMatchmaking(){
   sbIsSearching=false;clearInterval(sbPollTimer);clearInterval(window.sbTimerSync);
   if(sbRoomId&&sbPlayerColor==='w')sbDelete('chess_rooms','id=eq.'+sbRoomId+'&status=eq.waiting').catch(()=>{});
@@ -4238,23 +4283,28 @@ function copyRoomCode(){
 
 
 async function checkSupabaseStatus(){
+  // Test connection using WebSocket (no REST API needed)
   try{
-    const res=await fetch(SUPA_URL+'/rest/v1/chess_rooms?limit=1&apikey='+SUPA_KEY,{headers:SUPA_HDRS});
-    if(res.ok){
+    const wsUrl=SUPA_URL.replace('https://','wss://')+'/realtime/v1/websocket?apikey='+SUPA_KEY+'&vsn=1.0.0';
+    const testWS=new WebSocket(wsUrl);
+    testWS.onopen=()=>{
       const dot=document.getElementById('sb-status-dot');
       if(dot)dot.style.color='#2ecc71';
       const countEl=document.getElementById('online-count');
       const gamesEl=document.getElementById('games-count');
       if(countEl)countEl.textContent='✓ Live';
       if(gamesEl)gamesEl.textContent='Ready';
-      autoMigrate().catch(()=>{});
-    }
+      testWS.close();
+    };
+    testWS.onerror=()=>{
+      const dot=document.getElementById('sb-status-dot');
+      if(dot)dot.style.color='#e74c3c';
+      setTimeout(checkSupabaseStatus,5000);
+    };
   }catch(e){
     const dot=document.getElementById('sb-status-dot');
     if(dot)dot.style.color='#e74c3c';
-    console.error('Supabase connection failed:',e.message);
-    // Retry after 5s
-    setTimeout(checkSupabaseStatus, 5000);
+    setTimeout(checkSupabaseStatus,5000);
   }
 }
 
