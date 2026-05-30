@@ -1292,33 +1292,35 @@ const SUPA_HDRS = {
   'apikey': SUPA_KEY,
   'Authorization': 'Bearer ' + SUPA_KEY,
   'Content-Type': 'application/json',
-  'Prefer': 'return=representation'
+  'Prefer': 'return=representation',
+  'X-Client-Info': 'chessx/1.0'
 };
 
 async function sbSelect(table, query=''){
-  const res = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+query, {headers: SUPA_HDRS});
-  if(!res.ok) throw new Error('sbSelect failed: '+res.status);
+  const sep = query ? '&' : '';
+  const res = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+query+sep+'apikey='+SUPA_KEY, {headers: SUPA_HDRS});
+  if(!res.ok) throw new Error('sbSelect failed: '+res.status+' '+await res.text().catch(()=>''));
   return res.json();
 }
 
 async function sbInsert(table, data){
-  const res = await fetch(SUPA_URL+'/rest/v1/'+table, {
+  const res = await fetch(SUPA_URL+'/rest/v1/'+table+'?apikey='+SUPA_KEY, {
     method:'POST', headers: SUPA_HDRS, body: JSON.stringify(data)
   });
-  if(!res.ok) throw new Error('sbInsert failed: '+res.status);
+  if(!res.ok) throw new Error('sbInsert failed: '+res.status+' '+await res.text().catch(()=>''));
   return res.json();
 }
 
 async function sbUpdate(table, query, data){
-  const res = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+query, {
+  const res = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+query+'&apikey='+SUPA_KEY, {
     method:'PATCH', headers: SUPA_HDRS, body: JSON.stringify(data)
   });
-  if(!res.ok) throw new Error('sbUpdate failed: '+res.status);
+  if(!res.ok) throw new Error('sbUpdate failed: '+res.status+' '+await res.text().catch(()=>''));
   return res.json();
 }
 
 async function sbDelete(table, query){
-  const res = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+query, {
+  const res = await fetch(SUPA_URL+'/rest/v1/'+table+'?'+query+'&apikey='+SUPA_KEY, {
     method:'DELETE', headers: SUPA_HDRS
   });
   if(!res.ok) throw new Error('sbDelete failed: '+res.status);
@@ -4009,8 +4011,13 @@ async function startRealMatchmaking(){
   },1000);
 
   try{
-    // Clean up any old rooms from this player
-    await sbDelete('chess_rooms','host_id=eq.'+sbPlayerId+'&status=eq.waiting').catch(()=>{});
+    // Test connection first
+    const testRes = await fetch(SUPA_URL+'/rest/v1/chess_rooms?limit=1&apikey='+SUPA_KEY,{headers:SUPA_HDRS});
+    if(!testRes.ok){
+      throw new Error('Server error: '+testRes.status+' '+testRes.statusText);
+    }
+    // Clean up any old rooms from this player (ignore errors)
+    try{ await sbDelete('chess_rooms','host_id=eq.'+sbPlayerId+'&status=eq.waiting'); }catch(e){}
 
     // Random stagger 0-1s to avoid race condition when all phones start together
     await new Promise(res=>setTimeout(res, Math.random()*1000));
@@ -4114,13 +4121,15 @@ async function startRealMatchmaking(){
     clearInterval(elTimer);
     sbIsSearching=false;resetMMWrap();
     document.getElementById('sb-status-dot').style.color='#e74c3c';
-    const errMsg=err.message||'';
-    sbSystemMsg(errMsg.includes('fetch')||errMsg.includes('network')||errMsg.includes('Failed')?
-      'No internet — check WiFi':'Connection error — try again');
+    const errMsg=err.message||'Unknown error';
+    console.error('Matchmaking error:',errMsg);
+    // Show error with actual message for debugging
+    sbSystemMsg('Error: '+errMsg.substring(0,50));
     const mmw=document.getElementById('mm-wrap');
     if(mmw)mmw.innerHTML=`<div style="text-align:center;padding:10px">
       <div style="font-size:28px;margin-bottom:8px">📡</div>
       <div style="font-size:11px;color:#e74c3c;letter-spacing:2px;margin-bottom:12px">CONNECTION FAILED</div>
+      <div style="font-size:9px;color:#888;margin-bottom:8px">${errMsg.substring(0,60)}</div>
       <button class="mp-btn" onclick="startRealMatchmaking()"
         style="padding:10px 30px;font-size:12px;letter-spacing:2px;width:100%">🔄 TRY AGAIN</button>
     </div>`;
@@ -4225,7 +4234,7 @@ function copyRoomCode(){
 
 async function checkSupabaseStatus(){
   try{
-    const res=await fetch(SUPA_URL+'/rest/v1/chess_rooms?limit=1',{headers:SUPA_HDRS});
+    const res=await fetch(SUPA_URL+'/rest/v1/chess_rooms?limit=1&apikey='+SUPA_KEY,{headers:SUPA_HDRS});
     if(res.ok){
       const dot=document.getElementById('sb-status-dot');
       if(dot)dot.style.color='#2ecc71';
@@ -4238,6 +4247,9 @@ async function checkSupabaseStatus(){
   }catch(e){
     const dot=document.getElementById('sb-status-dot');
     if(dot)dot.style.color='#e74c3c';
+    console.error('Supabase connection failed:',e.message);
+    // Retry after 5s
+    setTimeout(checkSupabaseStatus, 5000);
   }
 }
 
