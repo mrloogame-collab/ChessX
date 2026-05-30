@@ -2524,6 +2524,12 @@ function showResult(winner,reason){
     threefold:'Same position repeated 3 times. Draw by repetition!'
   };
   document.getElementById('res-icon').textContent=icons[reason]||'🏆';document.getElementById('res-title').textContent=titles[reason]||'GAME OVER';document.getElementById('res-desc').textContent=descs[reason]||'';document.getElementById('result-modal').classList.add('active');
+  // Reset rematch buttons to default state
+  const resBtns=document.getElementById('res-buttons');
+  if(resBtns) resBtns.innerHTML=`<button class="menu-btn" id="rematch-btn" onclick="handleRematch()">⚔ REMATCH</button><button class="menu-btn" onclick="closeModal('result-modal');goToMenu()">🏠 MENU</button>`;
+  const remStatus=document.getElementById('rematch-status');
+  if(remStatus){remStatus.style.display='none';remStatus.textContent='';}
+  clearTimeout(window._rematchTimer);
   // Only send resign signal if I actually resigned (not if opponent resigned)
   if(gameMode==='supabase'&&reason==='resign'&&window._iResigned){
     if(realtimeWS&&realtimeWS.readyState===1) realtimeWS.sbSend('resign',{player:sbPlayerId});
@@ -4369,7 +4375,9 @@ function handleRematch(){
 }
 
 function onRematchRequest(){
-  // Opponent wants a rematch — show accept/decline
+  // Only show if result modal is visible (game actually ended)
+  const modal=document.getElementById('result-modal');
+  if(!modal||!modal.classList.contains('active')) return;
   clearTimeout(window._rematchTimer);
   const btns=document.getElementById('res-buttons');
   const status=document.getElementById('rematch-status');
