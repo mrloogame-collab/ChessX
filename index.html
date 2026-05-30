@@ -1469,9 +1469,22 @@ function showScreen(id){
   if(id==='mp-screen') generateRoomCode();
   if(id==='settings-screen') buildSwatches();
   if(id==='online-screen'){
+    // Full reset of matchmaking state
+    sbIsSearching=false;
+    clearInterval(sbPollTimer);
+    clearInterval(window.sbTimerSync);
+    sbRoomId=null;
+    sbOpponentName='';
+    window.sbPlayerColor=null;
+    sbPlayerColor=null;
+    if(window._mmWS){try{window._mmWS.close();}catch(e){}window._mmWS=null;}
+    // Reset UI to default tab
+    setOnlineTab(window._currentOnlineTab||'quick');
+    // Hide chat panel
+    const chatEl=document.getElementById('online-chat-panel');
+    if(chatEl) chatEl.style.display='none';
     setTimeout(checkSupabaseStatus, 100);
-    setTimeout(cleanStaleRooms, 500);
-    setTimeout(loadPlayerProfile, 50); // load saved name + flag
+    setTimeout(loadPlayerProfile, 50);
   }
 }
 function closeModal(id){document.getElementById(id).classList.remove('active');}
