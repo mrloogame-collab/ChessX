@@ -1251,7 +1251,7 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
   <button class="g-btn" onclick="undoMove()">↩ UNDO</button>
   <button class="g-btn" onclick="confirmResign()">🏳 RESIGN</button>
   <button class="g-btn" id="chat-toggle-btn" onclick="toggleGameChat()" style="display:none">💬 CHAT</button>
-  <button class="g-btn" onclick="goToMenu()">🏠 MENU</button>
+  <button class="g-btn" onclick="confirmLeave()">🏠 MENU</button>
 </div>
 
 <!-- In-game floating chat panel (online only) -->
@@ -1280,6 +1280,14 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
 </div>
 <div id="story-dlg"><div class="dlg-speaker" id="dlg-speaker"></div><div class="dlg-text" id="dlg-text"></div><div class="dlg-cont"><button onclick="nextDialog()">Continue ▶</button></div></div>
 <div class="modal-ov" id="result-modal"><div class="modal-box"><div style="font-size:52px" id="res-icon">🏆</div><h2 id="res-title">VICTORY!</h2><p id="res-desc"></p><div id="res-buttons"><button class="menu-btn" id="rematch-btn" onclick="handleRematch()">⚔ REMATCH</button><button class="menu-btn" onclick="closeModal('result-modal');goToMenu()">🏠 MENU</button></div><div id="rematch-status" style="font-size:11px;color:#c9a84c;letter-spacing:2px;margin-top:8px;display:none"></div></div></div>
+<div class="modal-ov" id="leave-modal"><div class="modal-box">
+  <div style="font-size:44px">🚪</div>
+  <h2>LEAVE GAME?</h2>
+  <p>If you leave now, your opponent wins! You will lose this game.</p>
+  <button class="menu-btn" onclick="doLeave()" style="background:rgba(231,76,60,0.15);border-color:#e74c3c;color:#e74c3c">Yes, Leave & Forfeit</button>
+  <button class="menu-btn" onclick="document.getElementById('leave-modal').classList.remove('active')">No — Stay & Fight!</button>
+</div></div>
+
 <div class="modal-ov" id="resign-modal"><div class="modal-box"><div style="font-size:44px">🏳️</div><h2>SURRENDER?</h2><p>Do you truly wish to lay down your crown?</p><button class="menu-btn" onclick="doResign()">Yes, Surrender</button><button class="menu-btn" onclick="closeModal('resign-modal')">No — Fight On!</button></div></div>
 <div id="promo-modal"><div class="promo-box"><h3>⚔ PROMOTE SOLDIER</h3><div class="promo-choices" id="promo-choices"></div></div></div>
 <script>
@@ -4442,6 +4450,42 @@ function startRematchGame(){
     window.sbBoardFlipped=(newColor==='b');
     startP2PGame();
   }
+}
+
+
+function confirmLeave(){
+  // Single player / local / conquest — just go to menu directly
+  if(gameMode!=='supabase'&&gameMode!=='p2p'){
+    clearInterval(timerInterval);AUD.stopTheme();
+    showScreen('title-screen');
+    return;
+  }
+  // Online / P2P — warn player
+  const modal=document.getElementById('leave-modal');
+  if(modal) modal.classList.add('active');
+}
+
+function doLeave(){
+  // Close modal
+  const modal=document.getElementById('leave-modal');
+  if(modal) modal.classList.remove('active');
+  // Treat as resign — opponent wins
+  window._iResigned=true;
+  if(gameMode==='p2p'){
+    if(p2pWS&&p2pWS.readyState===1)
+      p2pWS.sbSend('p2p_resign',{player:p2pPlayerId});
+    clearInterval(timerInterval);AUD.stopTheme();
+    cleanupP2P(false);
+  } else if(gameMode==='supabase'){
+    if(realtimeWS&&realtimeWS.readyState===1)
+      realtimeWS.sbSend('resign',{player:sbPlayerId});
+    clearInterval(timerInterval);clearInterval(window.sbTimerSync);
+    clearInterval(sbPollTimer);
+    if(realtimeWS){try{realtimeWS.close();}catch(e){}realtimeWS=null;}
+    sbIsSearching=false;sbRoomId=null;sbPlayerColor=null;
+    gameMode='';
+  }
+  showScreen('title-screen');
 }
 
 /* ══ INIT ══ */
