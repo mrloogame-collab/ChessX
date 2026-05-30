@@ -1279,7 +1279,7 @@ input[type=range].vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width
 </div>
 </div>
 <div id="story-dlg"><div class="dlg-speaker" id="dlg-speaker"></div><div class="dlg-text" id="dlg-text"></div><div class="dlg-cont"><button onclick="nextDialog()">Continue ▶</button></div></div>
-<div class="modal-ov" id="result-modal"><div class="modal-box"><div style="font-size:52px" id="res-icon">🏆</div><h2 id="res-title">VICTORY!</h2><p id="res-desc"></p><button class="menu-btn" onclick="closeModal('result-modal');startGame(currentMode,currentDifficulty)">⚔ REMATCH</button><button class="menu-btn" onclick="closeModal('result-modal');goToMenu()">🏠 MENU</button></div></div>
+<div class="modal-ov" id="result-modal"><div class="modal-box"><div style="font-size:52px" id="res-icon">🏆</div><h2 id="res-title">VICTORY!</h2><p id="res-desc"></p><div id="res-buttons"><button class="menu-btn" id="rematch-btn" onclick="handleRematch()">⚔ REMATCH</button><button class="menu-btn" onclick="closeModal('result-modal');goToMenu()">🏠 MENU</button></div><div id="rematch-status" style="font-size:11px;color:#c9a84c;letter-spacing:2px;margin-top:8px;display:none"></div></div></div>
 <div class="modal-ov" id="resign-modal"><div class="modal-box"><div style="font-size:44px">🏳️</div><h2>SURRENDER?</h2><p>Do you truly wish to lay down your crown?</p><button class="menu-btn" onclick="doResign()">Yes, Surrender</button><button class="menu-btn" onclick="closeModal('resign-modal')">No — Fight On!</button></div></div>
 <div id="promo-modal"><div class="promo-box"><h3>⚔ PROMOTE SOLDIER</h3><div class="promo-choices" id="promo-choices"></div></div></div>
 <script>
@@ -3734,6 +3734,9 @@ function connectRealtime(roomId){
     if(event==='resign'&&payload.player!==sbPlayerId) onRemoteResign();
     if(event==='offer_draw') onDrawOffer();
     if(event==='timer_sync'&&payload.player!==sbPlayerId) onTimerSync(payload);
+    if(event==='rematch_request'&&payload.player!==sbPlayerId) onRematchRequest();
+    if(event==='rematch_accept'&&payload.player!==sbPlayerId) onRematchAccept();
+    if(event==='rematch_decline'&&payload.player!==sbPlayerId) onRematchDecline();
   });
 }
 
@@ -4331,6 +4334,105 @@ async function checkSupabaseStatus(){
     const dot=document.getElementById('sb-status-dot');
     if(dot)dot.style.color='#e74c3c';
     setTimeout(checkSupabaseStatus,5000);
+  }
+}
+
+
+/* ══ REMATCH SYSTEM ══ */
+function handleRematch(){
+  // Single player / local / conquest — just restart
+  if(gameMode!=='supabase'&&gameMode!=='p2p'){
+    closeModal('result-modal');
+    startGame(currentMode,currentDifficulty);
+    return;
+  }
+  // Online / P2P — send request to opponent
+  const btn=document.getElementById('rematch-btn');
+  const status=document.getElementById('rematch-status');
+  if(btn) btn.disabled=true;
+  if(btn) btn.textContent='⏳ Waiting...';
+  if(status){status.style.display='block';status.textContent='Rematch request sent — waiting for opponent…';}
+
+  // Send rematch request via realtime
+  const ws = gameMode==='p2p' ? p2pWS : realtimeWS;
+  const myId = gameMode==='p2p' ? p2pPlayerId : sbPlayerId;
+  if(ws&&ws.readyState===1){
+    ws.sbSend('rematch_request',{player:myId});
+  }
+
+  // Auto cancel after 30s
+  window._rematchTimer=setTimeout(()=>{
+    if(btn){btn.disabled=false;btn.textContent='⚔ REMATCH';}
+    if(status){status.textContent='Rematch declined — opponent left.';
+      setTimeout(()=>{status.style.display='none';},2000);}
+  },30000);
+}
+
+function onRematchRequest(){
+  // Opponent wants a rematch — show accept/decline
+  clearTimeout(window._rematchTimer);
+  const btns=document.getElementById('res-buttons');
+  const status=document.getElementById('rematch-status');
+  if(btns) btns.innerHTML=`
+    <div style="font-size:11px;color:#c9a84c;letter-spacing:2px;margin-bottom:8px">⚔ OPPONENT WANTS REMATCH!</div>
+    <button class="menu-btn" onclick="acceptRematch()" style="background:rgba(46,204,113,0.15);border-color:#2ecc71;color:#2ecc71">✓ ACCEPT</button>
+    <button class="menu-btn" onclick="declineRematch()" style="background:rgba(231,76,60,0.15);border-color:#e74c3c;color:#e74c3c">✗ DECLINE</button>`;
+  if(status){status.style.display='block';status.textContent='Respond to rematch request…';}
+}
+
+function acceptRematch(){
+  // Send accept signal
+  const ws = gameMode==='p2p' ? p2pWS : realtimeWS;
+  const myId = gameMode==='p2p' ? p2pPlayerId : sbPlayerId;
+  if(ws&&ws.readyState===1){
+    ws.sbSend('rematch_accept',{player:myId});
+  }
+  startRematchGame();
+}
+
+function declineRematch(){
+  // Send decline signal
+  const ws = gameMode==='p2p' ? p2pWS : realtimeWS;
+  const myId = gameMode==='p2p' ? p2pPlayerId : sbPlayerId;
+  if(ws&&ws.readyState===1){
+    ws.sbSend('rematch_decline',{player:myId});
+  }
+  closeModal('result-modal');
+  goToMenu();
+}
+
+function onRematchAccept(){
+  clearTimeout(window._rematchTimer);
+  startRematchGame();
+}
+
+function onRematchDecline(){
+  clearTimeout(window._rematchTimer);
+  const btn=document.getElementById('rematch-btn');
+  const status=document.getElementById('rematch-status');
+  if(btn){btn.disabled=false;btn.textContent='⚔ REMATCH';}
+  if(status){status.textContent='Opponent declined rematch.';status.style.display='block';}
+  setTimeout(()=>{
+    closeModal('result-modal');
+    goToMenu();
+  },2000);
+}
+
+function startRematchGame(){
+  closeModal('result-modal');
+  clearTimeout(window._rematchTimer);
+  // Swap colors for rematch
+  const newColor = (gameMode==='p2p'?p2pColor:sbPlayerColor)==='w'?'b':'w';
+  if(gameMode==='supabase'){
+    sbPlayerColor=newColor;
+    window.sbPlayerColor=newColor;
+    window.sbBoardFlipped=(newColor==='b');
+    startOnlineGame(newColor,sbOpponentName);
+  } else if(gameMode==='p2p'){
+    p2pColor=newColor;
+    window.sbPlayerColor=newColor;
+    window.sbBoardFlipped=(newColor==='b');
+    startP2PGame();
   }
 }
 
