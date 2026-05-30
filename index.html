@@ -4020,12 +4020,14 @@ async function startRealMatchmaking(){
     const searchEnd=Date.now()+5000; // search for 5 seconds
     while(!joined && Date.now()<searchEnd && sbIsSearching){
       try{
-        // Search ALL waiting rooms - no mode filter to avoid DB column issues
+        // Search online rooms only (not P2P or friend rooms)
         const open=await sbSelect('chess_rooms','status=eq.waiting&order=created_at.asc&limit=20');
         const now=Date.now();
         const valid=(open||[]).filter(r=>
           r.host_id!==sbPlayerId &&
-          (now-new Date(r.created_at).getTime())<120000 // max 2 min old
+          !r.id.startsWith('P2P_') && // exclude P2P rooms
+          r.mode!=='p2p' && r.mode!=='friend' && // exclude P2P and friend
+          (now-new Date(r.created_at).getTime())<120000
         );
         for(const room of valid){
           if(!sbIsSearching) break;
@@ -4058,13 +4060,26 @@ async function startRealMatchmaking(){
     if(!sbIsSearching) return;
     sbRoomId='r_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);
     sbPlayerColor='w';
-    await sbInsert('chess_rooms',{
-      id:sbRoomId, host_id:sbPlayerId, host_name:myName,
-      host_rating:myRating, status:'waiting', board_state:'',
-      current_turn:'w', last_move:'', mode:matchMode
-    });
-    connectRealtime(sbRoomId);
-    showMMSearching(elapsed,'Room created — waiting for opponent…');
+    try{
+      await sbInsert('chess_rooms',{
+        id:sbRoomId, host_id:sbPlayerId, host_name:myName,
+        host_rating:myRating, status:'waiting', board_state:'',
+        current_turn:'w', last_move:'', mode:matchMode
+      });
+      connectRealtime(sbRoomId);
+      showMMSearching(elapsed,'Room created — waiting for opponent…');
+      sbSystemMsg('Room ready — searching for '+modeLabel+' opponent…');
+    }catch(insertErr){
+      // Insert failed - retry after delay
+      sbSystemMsg('Connecting… please wait');
+      await new Promise(res=>setTimeout(res,2000));
+      await sbInsert('chess_rooms',{
+        id:sbRoomId, host_id:sbPlayerId, host_name:myName,
+        host_rating:myRating, status:'waiting', board_state:'',
+        current_turn:'w', last_move:'', mode:matchMode
+      });
+      connectRealtime(sbRoomId);
+    }
 
     // Poll own room AND keep searching for other rooms simultaneously
     let pollCount=0;
