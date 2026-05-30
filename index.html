@@ -2499,11 +2499,11 @@ function showResult(winner,reason){
   if(gameMode==='supabase' && window._currentOnlineTab==='ranked'){
     handleRankedGameEnd(winner, reason).catch(()=>{});
   }
-  const icons={checkmate:'🏆',stalemate:'🤝',timeout:'⏰',resign:'🏳️'},titles={checkmate:winner==='w'?'WHITE WINS!':'BLACK WINS!',stalemate:'STALEMATE',timeout:"TIME'S UP!",resign:'SURRENDER'},descs={
+  const icons={checkmate:'🏆',stalemate:'🤝',timeout:'⏰',resign:'🏳️'},titles={checkmate:winner==='w'?'WHITE WINS!':'BLACK WINS!',stalemate:'STALEMATE',timeout:"TIME'S UP!",resign: winner===turn ? 'SURRENDER' : 'VICTORY!'},descs={
     checkmate:`${winner==='w'?'White':'Black'} Army conquered the throne!`,
     stalemate:'No legal moves — stalemate! An honorable draw.',
     timeout:`${winner==='w'?'White':'Black'} Army wins! Time expired.`,
-    resign:'Your army has surrendered.',
+    resign: winner ? (winner===turn?'Your army has surrendered.':'Opponent surrendered — You Win!') : 'Your army has surrendered.',
     insufficient:'Only kings remain — insufficient material to checkmate. Draw!',
     fiftymove:'50 moves without a capture or pawn move. Draw by fifty-move rule!',
     threefold:'Same position repeated 3 times. Draw by repetition!'
