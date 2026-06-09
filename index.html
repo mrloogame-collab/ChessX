@@ -2341,7 +2341,7 @@ function renderBoard(){
     const r=flipped?7-ri:ri; const c=flipped?7-ci:ci;
     const cell=document.createElement('div');cell.className='cell '+((r+c)%2===0?'light':'dark');cell.dataset.r=r;cell.dataset.c=c;cell.dataset.ri=ri;cell.dataset.ci=ci;
     const piece=board[r]?board[r][c]:null;
-    if(piece){const dv=document.createElement('div');if(pieceStyle==='classic'){dv.className='piece-classic';const _wk=piece.type+'_'+piece.color;dv.innerHTML='<img src="'+WOODEN_PIECES[_wk]+'" alt="'+piece.type+'">';}else{dv.className='piece';dv.style.cssText='width:90%;height:90%;display:flex;align-items:center;justify-content:center;overflow:visible;';// Use cultural pieces for enemy (black) in conquest mode
+    if(piece){const dv=document.createElement('div');if(pieceStyle==='classic'){dv.className='piece-classic';const _wk=piece.type+'_'+piece.color;dv.innerHTML='<img src="'+WOODEN_PIECES[_wk]+'" alt="'+piece.type+'">';}else{dv.className='piece';dv.style.cssText='width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;';// Use cultural pieces for enemy (black) in conquest mode
 const kId=gameMode==='conquest'&&piece.color==='b'&&activeConquestKingdom?activeConquestKingdom.id:null;dv.innerHTML=kId?culturalPieceSVG(piece.type,piece.color,kId):pieceSVG(piece.type,piece.color);}cell.appendChild(dv);}
     if(selected&&selected.r===r&&selected.c===c)cell.classList.add('sel');
     const mv=legalMoves.find(m=>m.r===r&&m.c===c);if(mv){if(board[r][c]||mv.enPassant)cell.classList.add('pc');else cell.classList.add('pm');}
