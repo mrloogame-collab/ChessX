@@ -2568,7 +2568,7 @@ function showResult(winner,reason){
   clearInterval(window.sbTimerSync);
   hideGameChatBtn();
   // Update ranked rating if this was a ranked game
-  if(gameMode==='supabase' && window._currentOnlineTab==='ranked'){
+  if(gameMode==='supabase' && window._gameMatchMode==='ranked'){
     handleRankedGameEnd(winner, reason).catch(()=>{});
   }
   const icons={checkmate:'🏆',stalemate:'🤝',timeout:'⏰',resign:'🏳️'},titles={checkmate:winner==='w'?'WHITE WINS!':'BLACK WINS!',stalemate:'STALEMATE',timeout:"TIME'S UP!",resign: (gameMode==='p2p'||gameMode==='supabase') ? (window._iResigned?'DEFEATED':'VICTORY!') : 'GAME OVER'},descs={
@@ -3548,7 +3548,7 @@ function showRankUpToast(tier,rating,change){
 }
 
 async function handleRankedGameEnd(winner,reason){
-  if(window._currentOnlineTab!=='ranked') return;
+  if(window._gameMatchMode!=='ranked') return;
   const myColor=sbPlayerColor;
   const oppRating=window._sbOpponentRating||1200;
   const oppName=sbOpponentName||'Opponent';
@@ -4236,6 +4236,7 @@ async function startRealMatchmaking(){
           sbOpponentName=data.name||'Opponent';
           sbRoomId='game_'+[sbPlayerId,data.id].sort().join('_');
           window.sbPlayerColor=sbPlayerColor; // ensure window copy is set
+          window._gameMatchMode=window._currentOnlineTab||'quick'; // lock in match mode
           
           // Send match confirmation
           ws.send(JSON.stringify({
@@ -4276,6 +4277,7 @@ async function startRealMatchmaking(){
 
           sbPlayerColor=data.color==='w'?'b':'w'; // opposite of sender
           window.sbPlayerColor=sbPlayerColor; // ensure window copy is set
+          window._gameMatchMode=window._currentOnlineTab||'quick'; // lock in match mode
           sbOpponentName=data.fromName||'Opponent';
           sbRoomId=data.roomId;
 
